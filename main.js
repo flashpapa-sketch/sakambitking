@@ -2733,7 +2733,8 @@ window.addEventListener("keydown", e => {
 function fitCanvas() {
   const view = canvas.parentElement;
   const w = view.clientWidth - 4, h = view.clientHeight - 4;
-  const cw = Math.max(240, Math.floor(Math.min(w, h * 1.5)));
+  const VIEW_SCALE = 0.8; // 迷宮画面の大きさ（表示領域に対する割合）
+  const cw = Math.max(240, Math.floor(Math.min(w, h * 1.5) * VIEW_SCALE));
   canvas.style.width = cw + "px";
   canvas.style.height = Math.floor(cw / 1.5) + "px";
 }
