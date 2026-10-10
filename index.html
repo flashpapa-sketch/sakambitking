@@ -132,6 +132,10 @@
 
   #miniMapPanel[hidden] { display: none; }
 
+  #previewPanel { padding: 6px; }
+  #previewCanvas { display: block; height: clamp(110px, 24vh, 240px); width: auto; max-width: 100%; margin: 0 auto; background: #000; }
+  #previewText { font-size: 14px; line-height: 1.5; padding: 4px 2px 0; color: var(--ink); min-height: 2.6em; }
+
   #miniMap {
     display: block;
     width: 100%;
@@ -254,6 +258,11 @@
   .red { color: var(--red); }
   .dim { color: var(--dim); }
 
+  /* 画面の高さが足りない時は、プレビューを隠して状態・地図が切れないようにする */
+  @media (min-width: 821px) and (max-height: 820px) {
+    #previewPanel { display: none; }
+  }
+
   @media (max-width: 820px) {
     #game {
       grid-template-columns: minmax(0, 1fr);
@@ -268,6 +277,7 @@
     #meta { text-align: left; font-size: 12px; padding: 6px 8px; }
     #side { grid-template-columns: minmax(0, 1fr) 104px; align-items: start; }
     #miniMapPanel { padding: 3px; }
+    #previewPanel { display: none; }
     #message { font-size: 13px; padding: 8px; }
     #commands { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px; gap: 5px; }
     #commands button { font-size: 11px; min-height: 32px; padding: 4px 2px; }
@@ -284,6 +294,10 @@
       <div id="side">
         <div id="meta" class="panel"></div>
         <div id="miniMapPanel" class="panel" aria-label="地図"><canvas id="miniMap" width="228" height="228"></canvas></div>
+        <div id="previewPanel" class="panel" aria-label="敵のプレビュー">
+          <canvas id="previewCanvas" width="240" height="240"></canvas>
+          <div id="previewText"></div>
+        </div>
       </div>
     </div>
     <div id="touchControls" aria-label="タッチ操作">

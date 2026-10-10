@@ -8,6 +8,9 @@ const miniMapPanelEl = document.getElementById("miniMapPanel");
 const miniMapCanvas = document.getElementById("miniMap");
 const miniCtx = miniMapCanvas.getContext("2d");
 const msgEl = document.getElementById("message");
+const previewCanvas = document.getElementById("previewCanvas");
+const previewCtx = previewCanvas.getContext("2d");
+const previewTextEl = document.getElementById("previewText");
 const commandsEl = document.getElementById("commands");
 const touchEl = document.getElementById("touchControls");
 const overlayEl = document.getElementById("overlay");
@@ -1506,8 +1509,44 @@ function closeModal() {
   overlayEl.classList.remove("show");
 }
 
+// 右側のプレビュー：戦闘中は現れている敵の絵・名前・体力を表示
+function drawSpriteTo(g, id, cx, cy, ps) {
+  const spr = SPRITES[id] || SPRITES.skeleton;
+  const rows = spr.d, H = rows.length, W = rows[0].length;
+  const ox = Math.round(cx - W * ps / 2), oy = Math.round(cy - H * ps / 2);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const ch = rows[r][c];
+    if (ch === "." || ch === "0") continue;
+    const col = spr.p[parseInt(ch, 16)];
+    if (!col) continue;
+    g.fillStyle = col;
+    g.fillRect(ox + c * ps, oy + r * ps, ps, ps);
+  }
+}
+
+function drawPreview() {
+  const g = previewCtx, W = previewCanvas.width, H = previewCanvas.height;
+  g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#d9b65f"; g.lineWidth = 2; g.strokeRect(1, 1, W - 2, H - 2);
+  if (mode !== "battle" || !battle) {
+    previewTextEl.textContent = "戦闘になると、ここに敵の姿が映る。";
+    return;
+  }
+  const id = battle.id, m = MONSTERS[id];
+  const alive = battle.enemies.filter(e => e.hp > 0).length;
+  const img = monsterImages[id];
+  if (img && img.complete && img.naturalWidth) {
+    g.imageSmoothingEnabled = true;
+    g.drawImage(img, 16, 16, W - 32, H - 32);
+  } else {
+    drawSpriteTo(g, id, W / 2, H / 2, 6);
+  }
+  previewTextEl.textContent = `${m.name}　残り${alive}体`;
+}
+
 function render() {
   drawScene();
+  drawPreview();
   renderHud();
   renderCommands();
   msgEl.textContent = message;
