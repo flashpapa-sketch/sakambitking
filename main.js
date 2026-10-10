@@ -126,7 +126,7 @@ const SPELLS = {
 
 const FLOORS = [
   {
-    name: "B1F 廃兵の回廊", color: "#58ff9a", start: [1, 17, 0], encounter: 0.08,
+    name: "地下1階 廃兵の回廊", color: "#58ff9a", start: [1, 17, 0], encounter: 0.08,
     map: [
       "###################",
       "#..T....#.....E..>#",
@@ -159,7 +159,7 @@ const FLOORS = [
     monsters: ["skeleton","kobold","rat","brigand","goblin","zombie","cave_bat","slime","cave_spider","imp","bandit","mushroom_man","toad","mud_bat","bone_dog","plague_rat","thug","hollow","rust_sprite","cave_worm"]
   },
   {
-    name: "B2F 魔導工房跡", color: "#60c8ff", start: [1, 1, 1], encounter: 0.105,
+    name: "地下2階 魔導工房跡", color: "#60c8ff", start: [1, 1, 1], encounter: 0.105,
     map: [
       "###################",
       "#<....#......T....#",
@@ -193,7 +193,7 @@ const FLOORS = [
     monsters: ["gargoyle","wisp","moth","golem","fire_elemental","ice_sprite","stone_snake","bronze_scarab","crystal_fly","hex_eye","venom_moth","amber_golem","sand_wraith","cave_leech","rock_crab","mold_creep","dust_devil","toxic_ooze","brass_knight","jar_ghost","swarm_bee","chaos_sprite","magma_slug","gloom_bat"]
   },
   {
-    name: "B3F 地下牢獄", color: "#bf8cff", start: [1, 1, 1], encounter: 0.12,
+    name: "地下3階 地下牢獄", color: "#bf8cff", start: [1, 1, 1], encounter: 0.12,
     map: [
       "###################",
       "#<......#.........#",
@@ -227,7 +227,7 @@ const FLOORS = [
     monsters: ["minotaur","warden","shade","hound","dark_knight","bone_mage","chain_ghost","stone_troll","cave_bear","wolf_shade","plague_doc","prison_guard","iron_claw","mist_hag","eye_beast","shadow_dog","dungeon_rat","rot_walker","blood_moth","tomb_bat","ruin_warden","hex_hand","mud_troll","cave_horror"]
   },
   {
-    name: "B4F 宝物庫回廊", color: "#ffcf66", start: [1, 1, 1], encounter: 0.135,
+    name: "地下4階 宝物庫回廊", color: "#ffcf66", start: [1, 1, 1], encounter: 0.135,
     map: [
       "###################",
       "#<....T#..........#",
@@ -258,7 +258,7 @@ const FLOORS = [
     monsters: ["dragon","banshee","lich","mimic","vampire","wyvern","basilisk","medusa","bone_lord","death_knight","necromancer","gold_golem","chaos_knight","shadow_dragon","void_eye","plague_knight","flame_lich","iron_golem","rune_guardian","elder_mimic","void_slime","cursed_armor","death_moth","sin_eater","arch_wisp"]
   },
   {
-    name: "B5F 玉座の間", color: "#ff6666", start: [1, 1, 1], encounter: 0.10,
+    name: "地下5階 玉座の間", color: "#ff6666", start: [1, 1, 1], encounter: 0.10,
     map: [
       "###################",
       "#<................#",
@@ -929,7 +929,7 @@ function enemyRound(log) {
         target.maxHp = Math.max(1, target.maxHp - rand(2, 5));
         target.hp = Math.min(target.hp, target.maxHp);
         sfx.curse();
-        log.push(`${target.name}はレベルを奪われた！（Lv${target.lv}）`);
+        log.push(`${target.name}はレベルを奪われた！（レベル${target.lv}）`);
       }
     }
     if (e.skill === "mirror" && Math.random() < 0.35) {
@@ -1011,7 +1011,7 @@ function victory(log) {
     p.exp += exp;
     levelUp(p, log);
   }
-  log.push(`勝利。${exp}EXPと${gold}Gを得た。`);
+  log.push(`勝利。経験値${exp}と${gold}ゴールドを得た。`);
   const hasChest = Math.random() < 0.45;
   if (tryRecruitment(log.join("\n"), hasChest)) return;
   if (hasChest) { openChest(CHESTS.battle, null, log.join("\n")); return; }
@@ -1170,7 +1170,7 @@ function lootChest(force = false) {
   if (chest.doneFlag) state.flags[chest.doneFlag] = true;
   const prefix = chest.prefix || "";
   endBattle();
-  message = `${prefix ? prefix + "\n" : ""}宝箱を開けた。${gold}G${got.length ? "と" + got.join("、") : ""}を得た。`;
+  message = `${prefix ? prefix + "\n" : ""}宝箱を開けた。${gold}ゴールド${got.length ? "と" + got.join("、") : ""}を得た。`;
   render();
 }
 
@@ -1224,7 +1224,7 @@ function town(extra = "") {
 function rest() {
   const cost = 30 + state.party.reduce((s, p) => s + p.lv * 8, 0);
   if (state.gold < cost) {
-    message = `宿代は${cost}G。足りない。`;
+    message = `宿代は${cost}ゴールド。足りない。`;
     return render();
   }
   state.gold -= cost;
@@ -1235,7 +1235,7 @@ function rest() {
       delete p.status.sleep;
     }
   });
-  message = `馬小屋で休んだ。${cost}G支払った。`;
+  message = `馬小屋で休んだ。${cost}ゴールド支払った。`;
   render();
 }
 
@@ -1243,13 +1243,13 @@ function decurse() {
   const cursed = state.party.find(p => p.cursedSlot);
   if (!cursed) { message = "寺院: 呪われた者はいない。"; return render(); }
   const cost = 600 + cursed.lv * 100;
-  if (state.gold < cost) { message = `寺院: 呪い解きには${cost}G必要だ。`; return render(); }
+  if (state.gold < cost) { message = `寺院: 呪い解きには${cost}ゴールド必要だ。`; return render(); }
   state.gold -= cost;
   const slot = cursed.cursedSlot;
   const eqId = cursed.equip[slot];
   cursed.equip[slot] = null;
   cursed.cursedSlot = undefined;
-  message = `${cursed.name}の呪いが解けた。${EQUIPMENT[eqId]?.name || "装備"}が砕けた。${cost}Gを献金した。`;
+  message = `${cursed.name}の呪いが解けた。${EQUIPMENT[eqId]?.name || "装備"}が砕けた。${cost}ゴールドを献金した。`;
   render();
 }
 
@@ -1269,7 +1269,7 @@ function temple() {
   const cost = isAshes ? 500 + target.lv * 150 : 250 + target.lv * 80;
   if (state.gold < cost) {
     const stateLabel = isAshes ? "灰化" : "死亡";
-    message = `寺院: ${target.name}(${stateLabel})の蘇生には${cost}G必要だ。`;
+    message = `寺院: ${target.name}(${stateLabel})の蘇生には${cost}ゴールド必要だ。`;
     return render();
   }
   state.gold -= cost;
@@ -1285,9 +1285,9 @@ function temple() {
       const oldLv = target.lv;
       target.lv = Math.max(1, target.lv - 1);
       target.maxHp = Math.max(1, target.maxHp - rand(1, 4));
-      message = `${target.name}は灰の中から蘇った。${cost}Gを献金した。\nただし力は衰え、Lv${oldLv}→${target.lv}に落ちた。`;
+      message = `${target.name}は灰の中から蘇った。${cost}ゴールドを献金した。\nただし力は衰え、レベル${oldLv}→${target.lv}に落ちた。`;
     } else {
-      message = `${target.name}は蘇生した。${cost}Gを献金した。`;
+      message = `${target.name}は蘇生した。${cost}ゴールドを献金した。`;
     }
   } else {
     if (isAshes) {
@@ -1342,11 +1342,11 @@ function reorder() {
 }
 
 function showCamp() {
-  const inv = Object.entries(state.inventory).map(([id, n]) => `${ITEMS[id].name}x${n}`).join(" / ");
-  const stock = Object.entries(state.stock).filter(([, n]) => n > 0).map(([id, n]) => `${EQUIPMENT[id].name}x${n}`).join(" / ") || "なし";
+  const inv = Object.entries(state.inventory).map(([id, n]) => `${ITEMS[id].name}×${n}`).join(" / ");
+  const stock = Object.entries(state.stock).filter(([, n]) => n > 0).map(([id, n]) => `${EQUIPMENT[id].name}×${n}`).join(" / ") || "なし";
   showModal(`
     <h2>冒険者の町</h2>
-    <p>G: <span class="gold">${state.gold}</span></p>
+    <p>所持金: <span class="gold">${state.gold}</span></p>
     <p>道具: ${inv}</p>
     <p>予備装備: ${stock}</p>
     <div class="actions">
@@ -1362,8 +1362,8 @@ function showCamp() {
     </div>
     <h2>商店</h2>
     <div class="actions">
-      ${Object.entries(ITEMS).map(([id, it]) => `<button data-buy-kind="item" data-buy="${id}">${it.name} ${it.price}G</button>`).join("")}
-      ${Object.entries(EQUIPMENT).filter(([id, it]) => !it.cursed && id !== "muramasaShard").map(([id, it]) => `<button data-buy-kind="equip" data-buy="${id}">${it.name} ${it.price}G</button>`).join("")}
+      ${Object.entries(ITEMS).map(([id, it]) => `<button data-buy-kind="item" data-buy="${id}">${it.name} ${it.price}ゴールド</button>`).join("")}
+      ${Object.entries(EQUIPMENT).filter(([id, it]) => !it.cursed && id !== "muramasaShard").map(([id, it]) => `<button data-buy-kind="equip" data-buy="${id}">${it.name} ${it.price}ゴールド</button>`).join("")}
     </div>
   `);
 }
@@ -1375,11 +1375,11 @@ function showTransfer() {
       .filter(([id]) => id !== p.cls)
       .map(([id, c]) => `<button data-action="dotransfer" data-member="${i}" data-cls="${id}">${c.label}へ</button>`)
       .join("");
-    return `<p>${i + 1}. <span class="gold">${p.name}</span> ${p.className} Lv${p.lv} → ${opts}</p>`;
+    return `<p>${i + 1}. <span class="gold">${p.name}</span> ${p.className} レベル${p.lv} → ${opts}</p>`;
   }).join("");
   showModal(`
     <h2>訓練場 – 転職</h2>
-    <p class="dim">転職するとLv1に戻るが、HPと呪文スロットは保持される。費用: 300G</p>
+    <p class="dim">転職するとレベル1に戻るが、体力と呪文回数は保持される。費用: 300ゴールド</p>
     ${rows}
     <div class="actions"><button data-action="close">戻る</button></div>
   `);
@@ -1389,7 +1389,7 @@ function doTransfer(memberIdx, newCls) {
   const p = state.party[memberIdx];
   if (!p) return;
   const cost = 300;
-  if (state.gold < cost) { message = "転職費用が足りない（300G）。"; return render(); }
+  if (state.gold < cost) { message = "転職費用が足りない（300ゴールド）。"; return render(); }
   if (p.dead) { message = `${p.name}は死んでいるため転職できない。`; return render(); }
   state.gold -= cost;
   const c = CLASSES[newCls];
@@ -1409,7 +1409,7 @@ function doTransfer(memberIdx, newCls) {
     p.maxMp = [0, 0, 0];
     p.mp = [0, 0, 0];
   }
-  message = `${p.name}は${c.label}に転職した。Lv1から再出発だ。`;
+  message = `${p.name}は${c.label}に転職した。レベル1から再出発だ。`;
   closeModal();
   render();
 }
@@ -1420,9 +1420,9 @@ function showStatus() {
       : p.dead === "ashes" ? '<span style="color:#ff9900">【灰】</span>'
       : p.dead === "dead" ? '<span class="red">【死亡】</span>'
       : "";
-    const bad = Object.keys(p.status || {}).filter(k => p.status[k]).join(" ");
+    const bad = Object.keys(p.status || {}).filter(k => p.status[k]).map(statusLabel).join(" ");
     const equip = Object.values(p.equip).filter(Boolean).map(id => EQUIPMENT[id]?.name || id).join(" ");
-    return `<p>${i + 1}. <span class="gold">${p.name}</span> ${stateStr} ${p.className} Lv${p.lv} HP ${p.hp}/${p.maxHp} AC ${acOf(p)} ATK ${atkOf(p)} MP ${p.mp.join("/")}${bad ? ` <span class="red">${bad}</span>` : ""}${equip ? ` <span class="dim">[${equip}]</span>` : ""}</p>`;
+    return `<p>${i + 1}. <span class="gold">${p.name}</span> ${stateStr} ${p.className} レベル${p.lv} 体力 ${p.hp}/${p.maxHp} 防御 ${acOf(p)} 攻撃 ${atkOf(p)} 呪文 ${p.mp.join("/")}${bad ? ` <span class="red">${bad}</span>` : ""}${equip ? ` <span class="dim">[${equip}]</span>` : ""}</p>`;
   }).join("");
   showModal(`<h2>冒険者名簿</h2>${rows}<div class="actions"><button data-action="close">戻る</button></div>`);
 }
@@ -1440,8 +1440,8 @@ function showMap() {
 
 function showHelp() {
   showModal(`
-    <h2>v3の遊び方</h2>
-    <p>FC版Wizardryを意識し、6人隊列、AC、呪文回数、宝箱罠、寺院、宿屋、商店、地図、隊列変更を入れています。</p>
+    <h2>第三版の遊び方</h2>
+    <p>ファミコン版ウィザードリィを意識し、6人隊列、防御値、呪文回数、宝箱罠、寺院、宿屋、商店、地図、隊列変更を入れています。</p>
     <p>前列3人は通常攻撃が届きます。後列は魔法と祈りが主役です。盗賊が生きていると罠判定と遭遇率が楽になります。</p>
     <p>宝箱は「調査」「罠解除」「開ける」の順が基本。無理に開けると毒針や爆裂罠が来ます。</p>
     <div class="actions"><button data-action="close">戻る</button></div>
@@ -1451,8 +1451,8 @@ function showHelp() {
 function showTitle() {
   showModal(`
     ${titleImage.complete && titleImage.naturalWidth ? `<img src="img/title.png" alt="タイトル画像">` : ""}
-    <h1>サカムビット公の逆襲 v3</h1>
-    <p>六人の隊列で大迷宮へ潜る、ファミコンWizardry寄せの版です。玄室、罠箱、宿屋、寺院、呪文回数、ACを追加しました。</p>
+    <h1>サカムビット公の逆襲 第三版</h1>
+    <p>六人の隊列で大迷宮へ潜る、ファミコン版ウィザードリィ寄せの版です。玄室、罠箱、宿屋、寺院、呪文回数、防御値を追加しました。</p>
     <div class="actions">
       <button data-action="new">新しく始める</button>
       <button data-action="load">続きから</button>
@@ -1466,7 +1466,7 @@ function showEnding() {
     <h1>逆襲、成る</h1>
     <p>勇者アレックスは倒れ、デスフォールの玉座は再び主を得た。</p>
     <p>サカムビット公は振り返る。勝利したのは王冠ではなく、六人の隊列だった。</p>
-    <p class="gold">GAME CLEAR</p>
+    <p class="gold">攻略完了</p>
     <div class="actions"><button data-action="new">もう一度</button><button data-action="close">閉じる</button></div>
   `, true);
 }
@@ -1489,9 +1489,12 @@ function render() {
   msgEl.textContent = message;
 }
 
+const STATUS_LABELS = { poison: "毒", sleep: "睡眠", paralyze: "麻痺", burn: "炎上", bleed: "出血", slow: "鈍化", lost: "喪失" };
+function statusLabel(k) { return STATUS_LABELS[k] || k; }
+
 function renderHud() {
   partyEl.innerHTML = state.party.map((p, i) => {
-    const bad = Object.keys(p.status || {}).join(" ");
+    const bad = Object.keys(p.status || {}).map(statusLabel).join(" ");
     let borderColor = p.isNamedAlly ? "#bf8cff" : p.isMonster ? "#ff6020" : null;
     let extraStyle = "";
     let deadLabel = "";
@@ -1503,14 +1506,14 @@ function renderHud() {
     const cursedMark = p.cursedSlot ? ' <span style="color:#ff9900">呪</span>' : "";
     return `<div class="member ${p.hp <= 0 ? "dead" : ""}"${styleAttr}>
       <div class="name">${i + 1} ${p.name} ${p.className}${cursedMark}</div>
-      <div class="hp">HP ${p.hp}/${p.maxHp}</div>
-      <div>AC ${acOf(p)} ATK ${atkOf(p)} MP ${p.mp.join("/")}</div>
+      <div class="hp">体力 ${p.hp}/${p.maxHp}</div>
+      <div>防御${acOf(p)} 攻撃${atkOf(p)} 呪文${p.mp.join("/")}</div>
       <div class="bad">${deadLabel || bad || p.align}</div>
     </div>`;
   }).join("");
   metaEl.innerHTML = `<div class="gold">${floor().name}</div>
-    <div>向き ${DIRS[state.dir].name} / X${state.x} Y${state.y}</div>
-    <div>G ${state.gold} / 歩数 ${state.steps}</div>
+    <div>向き ${DIRS[state.dir].name} / 位置 横${state.x}・縦${state.y}</div>
+    <div>所持金 ${state.gold} / 歩数 ${state.steps}</div>
     <div>危険 ${state.danger} / 生存 ${living().length}/6</div>
     ${_dark > 0 ? `<div style="color:#ff9900">暗闇 残${_dark}歩</div>` : ""}
     ${_noSpell > 0 ? `<div style="color:#ff6666">魔封じ 残${_noSpell}歩</div>` : ""}`;
@@ -1562,10 +1565,10 @@ function drawTitle() {
   ctx.fillText("サカムビット公の逆襲", 480, 230 + Math.sin(frame / 28) * 5);
   ctx.fillStyle = "#f4ecd0";
   ctx.font = "24px 'MS Gothic', monospace";
-  ctx.fillText("WIZARDRY STYLE v3", 480, 284);
+  ctx.fillText("ウィザードリィ風 第三版", 480, 284);
   if (Math.floor(frame / 32) % 2 === 0) {
     ctx.fillStyle = "#d9b65f";
-    ctx.fillText("PRESS ENTER", 480, 430);
+    ctx.fillText("決定キーで開始", 480, 430);
   }
 }
 
@@ -1690,12 +1693,9 @@ function drawDungeon() {
     dg.addColorStop(1, `rgba(160,0,0,${da})`);
     ctx.fillStyle = dg; ctx.fillRect(0, 0, W, H);
   }
-  // 外枠 & 階名（左上）
+  // 外枠（階名は右上の状態欄に表示済みのため、縮小時に文字化けして見える画面内表示は廃止）
   ctx.strokeStyle = rgba(wc, .7); ctx.lineWidth = 3;
   ctx.strokeRect(2, 2, W - 4, H - 4);
-  ctx.fillStyle = wc; ctx.textAlign = "left";
-  ctx.font = "16px 'MS Gothic', monospace";
-  ctx.fillText(floor().name, 14, 20);
 }
 
 function slice(d) {
@@ -1830,7 +1830,7 @@ function drawBattle() {
     ctx.strokeRect(338, 362, 284, 14);
     ctx.fillStyle = "#aaa";
     ctx.font = "13px 'MS Gothic', monospace";
-    ctx.fillText(`HP ${e.hp}/${e.maxHp}`, 480, 388);
+    ctx.fillText(`体力 ${e.hp}/${e.maxHp}`, 480, 388);
   }
   // Enemy count dots
   const cnt = enemies.length;
@@ -1844,7 +1844,7 @@ function drawBattle() {
   }
   ctx.font = "16px 'MS Gothic', monospace";
   ctx.fillStyle = "#888";
-  ctx.fillText(`残り ${cnt}体  ROUND ${battle.round}`, 480, cnt > 1 ? 430 : 415);
+  ctx.fillText(`残り ${cnt}体  第${battle.round}ターン`, 480, cnt > 1 ? 430 : 415);
 }
 
 // Shared 24×24 pixel bodies (palette indices, '.' = transparent)
@@ -2631,7 +2631,7 @@ function drawCentered(text, color, size) {
   // GAME OVER line
   ctx.fillStyle = "#882222";
   ctx.font = "28px 'MS Gothic', monospace";
-  ctx.fillText("― GAME OVER ―", 480, 370);
+  ctx.fillText("― 冒険終了 ―", 480, 370);
   ctx.fillStyle = "#553333";
   ctx.font = "18px 'MS Gothic', monospace";
   ctx.fillText("寺院に運ぶ者もいない", 480, 408);

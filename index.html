@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>サカムビット公の逆襲 v3</title>
+<title>サカムビット公の逆襲 第三版</title>
 <style>
   :root {
     --bg: #000;
@@ -80,7 +80,8 @@
     display: block;
     border: 2px solid var(--line);
     background: #000;
-    image-rendering: pixelated;
+    /* 縮小表示で漢字が欠けて別の字に見えないよう、なめらかに縮小する */
+    image-rendering: auto;
   }
 
   .panel {
