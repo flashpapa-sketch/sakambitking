@@ -2542,7 +2542,30 @@ function drawSprite(id, cx, cy, ps) {
   }
 }
 
+// 過去に制作したモンスター絵（Group 1・採用シート）を対応する敵に割り当て
+const MONSTER_ART = {
+  rat: "001_rat", dungeon_rat: "001_rat", plague_rat: "009_rat_elite",
+  kobold: "005_jackal",
+  hound: "002_wolf", wolf_shade: "010_wolf_elite", shadow_dog: "008_hyena",
+  cave_bear: "007_bear",
+  stone_troll: "006_gorilla", mud_troll: "014_gorilla_elite"
+};
+const monsterImages = {};
+for (const [id, file] of Object.entries(MONSTER_ART)) {
+  const img = new Image();
+  img.src = `img/monsters/${file}.png`;
+  monsterImages[id] = img;
+}
+
 function drawMonsterGlyph(id, x, y) {
+  const img = monsterImages[id];
+  if (img && img.complete && img.naturalWidth) {
+    const s = 128;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, Math.round(x - s / 2), Math.round(y - s / 2), s, s);
+    ctx.imageSmoothingEnabled = true;
+    return;
+  }
   drawSprite(id, x, y, 4);
 }
 
