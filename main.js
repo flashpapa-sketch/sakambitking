@@ -124,9 +124,14 @@ const SPELLS = {
   ]
 };
 
+// 物語：奈落の城デスフォール。公サカムビットは、腐敗した勇者アレックスに玉座を奪われた。
+const PROLOGUE = "序章。かつて王城の主だったサカムビット公は、英雄の仮面をかぶった男に玉座を奪われた。残された六人の隊列と共に、公は奈落の城デスフォールの地下へ降りていく。石の口は、帰る者を拒むように開いていた。";
+const BOSS_INTRO = "「よくぞ降りてきた、サカムビット」。玉座の男の声は、かつての誇りをなぞるように低く響いた。「王冠はもう要らぬ。ならば、その隊列の強さを見せてみよ」";
+
 const FLOORS = [
   {
     name: "地下1階 廃兵の回廊", color: "#58ff9a", start: [1, 17, 0], encounter: 0.08,
+    intro: "第一章　廃兵の回廊。この城を守って倒れた兵たちは、死してなお剣を手放せずにいる。足音は石に吸われ、代わりに甲冑の軋みが背後から追ってくる。",
     map: [
       "###################",
       "#..T....#.....E..>#",
@@ -150,16 +155,17 @@ const FLOORS = [
     ],
     events: {
       "3,1": { type: "chest", table: "b1", once: true },
-      "15,1": { type: "message", text: "壁に『玄室に入る時は、帰り道を数えよ』と刻まれている。" },
-      "17,1": { type: "stairs", to: 1, need: "b1Key", locked: "扉は古い紋章鍵で閉じられている。" },
-      "16,15": { type: "flag", flag: "b1Key", text: "古い紋章鍵を拾った。" },
-      "9,5": { type: "rotate", text: "床が回転した！方向感覚が狂う。" },
-      "5,9": { type: "rotate", text: "魔法の渦が方向を歪めた。" }
+      "15,1": { type: "message", text: "壁に古い文字が刻まれている。『玄室に入る時は、帰り道を数えよ』。読み終えた瞬間、背後の闇が一歩近づいた気がした。" },
+      "17,1": { type: "stairs", to: 1, need: "b1Key", locked: "扉は古い紋章鍵で固く閉ざされている。紋章は、かつての王家のものだ。" },
+      "16,15": { type: "flag", flag: "b1Key", text: "床の隙間に埋もれていた古い紋章鍵を拾い上げた。冷たい金属が、なぜか懐かしい重みを持っている。" },
+      "9,5": { type: "rotate", text: "足元の床が突然回転した！どこが北で、どこが南か、もう判らない。" },
+      "5,9": { type: "rotate", text: "足元に魔法の渦が広がり、方向感覚がねじれていく。" }
     },
     monsters: ["skeleton","kobold","rat","brigand","goblin","zombie","cave_bat","slime","cave_spider","imp","bandit","mushroom_man","toad","mud_bat","bone_dog","plague_rat","thug","hollow","rust_sprite","cave_worm"]
   },
   {
     name: "地下2階 魔導工房跡", color: "#60c8ff", start: [1, 1, 1], encounter: 0.105,
+    intro: "第二章　魔導工房跡。かつてここで賢者たちは禁断の術を研いだ。その研究の果てに、城そのものが自らの方角を忘れてしまったという。",
     map: [
       "###################",
       "#<....#......T....#",
@@ -184,16 +190,17 @@ const FLOORS = [
     events: {
       "1,1": { type: "stairs", to: 0 },
       "13,1": { type: "chest", table: "b2", once: true },
-      "7,5": { type: "trap", damage: 8, text: "魔法陣が閃き、全員が焦げた。" },
+      "7,5": { type: "trap", damage: 8, text: "床の魔法陣が閃光を放ち、隊列全員が焦げついた。" },
       "17,16": { type: "stairs", to: 2 },
-      "9,9": { type: "dark", duration: 10, text: "呪いの霧が視界を奪う。明かりが消えた！" },
-      "3,13": { type: "rotate", text: "廊下が歪む。方位が反転した。" },
-      "15,13": { type: "spelltrap", text: "魔封じの間に踏み込んだ。しばらく呪文が使えない。", duration: 6 }
+      "9,9": { type: "dark", duration: 10, text: "呪いの霧が立ち込め、視界が黒く塗りつぶされた。松明の炎が消えた！" },
+      "3,13": { type: "rotate", text: "廊下がねじれ、方位が反転した。" },
+      "15,13": { type: "spelltrap", text: "魔封じの間に踏み込んだ。言葉が喉の奥で凍りつき、しばらく呪文は使えない。", duration: 6 }
     },
     monsters: ["gargoyle","wisp","moth","golem","fire_elemental","ice_sprite","stone_snake","bronze_scarab","crystal_fly","hex_eye","venom_moth","amber_golem","sand_wraith","cave_leech","rock_crab","mold_creep","dust_devil","toxic_ooze","brass_knight","jar_ghost","swarm_bee","chaos_sprite","magma_slug","gloom_bat"]
   },
   {
     name: "地下3階 地下牢獄", color: "#bf8cff", start: [1, 1, 1], encounter: 0.12,
+    intro: "第三章　地下牢獄。鎖に繋がれた罪人たちの呻きが、闇の底から這い上がってくる。この地では松明の火すら、長くは持たない。",
     map: [
       "###################",
       "#<......#.........#",
@@ -219,15 +226,16 @@ const FLOORS = [
       "1,1": { type: "stairs", to: 1 },
       "11,7": { type: "chest", table: "b3", once: true },
       "17,16": { type: "stairs", to: 3 },
-      "5,5": { type: "dark", duration: 14, text: "地下牢の闇が深い。松明が一瞬で消えた。" },
-      "13,11": { type: "rotate", text: "重力が歪む。上下左右がわからなくなった。" },
-      "9,3": { type: "trapdoor", damage: 12, text: "落とし穴！床が崩れ、全員が落下した。" },
+      "5,5": { type: "dark", duration: 14, text: "地下牢の闇はあまりに深い。松明の火が一瞬で吸い込まれて消えた。" },
+      "13,11": { type: "rotate", text: "重力が歪む。上も下も、左も右も、もはや判らない。" },
+      "9,3": { type: "trapdoor", damage: 12, text: "足元の床が崩れた！隊列全員が闇の底へ落下していく。" },
       "7,1": { type: "ally", id: "ralmhas", once: true }
     },
     monsters: ["minotaur","warden","shade","hound","dark_knight","bone_mage","chain_ghost","stone_troll","cave_bear","wolf_shade","plague_doc","prison_guard","iron_claw","mist_hag","eye_beast","shadow_dog","dungeon_rat","rot_walker","blood_moth","tomb_bat","ruin_warden","hex_hand","mud_troll","cave_horror"]
   },
   {
     name: "地下4階 宝物庫回廊", color: "#ffcf66", start: [1, 1, 1], encounter: 0.135,
+    intro: "第四章　宝物庫回廊。黄金は墓標のように積み上げられ、そのどれもが誰かの命と引き換えに集められたものだ。王印はこの奥に眠っている。",
     map: [
       "###################",
       "#<....T#..........#",
@@ -252,13 +260,14 @@ const FLOORS = [
     events: {
       "1,1": { type: "stairs", to: 2 },
       "6,1": { type: "chest", table: "b4", once: true },
-      "16,15": { type: "flag", flag: "royalSeal", text: "王印を取り戻した。玉座への封印が解ける。" },
-      "17,16": { type: "stairs", to: 4, need: "royalSeal", locked: "王印がなければ玉座へは進めない。" }
+      "16,15": { type: "flag", flag: "royalSeal", text: "王印を取り戻した。掌の中で印章が脈打ち、玉座への封印がゆっくりと解けていく。" },
+      "17,16": { type: "stairs", to: 4, need: "royalSeal", locked: "王印がなければ、玉座へ至る扉は開かない。" }
     },
     monsters: ["dragon","banshee","lich","mimic","vampire","wyvern","basilisk","medusa","bone_lord","death_knight","necromancer","gold_golem","chaos_knight","shadow_dragon","void_eye","plague_knight","flame_lich","iron_golem","rune_guardian","elder_mimic","void_slime","cursed_armor","death_moth","sin_eater","arch_wisp"]
   },
   {
     name: "地下5階 玉座の間", color: "#ff6666", start: [1, 1, 1], encounter: 0.10,
+    intro: "終章　玉座の間。広間の奥で王座に腰かけているのは、かつて人々が英雄と讃えた男だ。腐敗した勇者アレックスが、公の帰還を待っていた。",
     map: [
       "###################",
       "#<................#",
@@ -495,7 +504,8 @@ function newGame() {
   mode = "explore";
   battle = null;
   chest = null;
-  message = "デスフォール入口。六人の隊列が、石の胃袋へ飲み込まれていく。";
+  state.flags.intro0 = true;
+  message = PROLOGUE;
   reveal();
   render();
 }
@@ -690,7 +700,13 @@ function changeFloor(to) {
   const s = FLOORS[to].start;
   state.x = s[0]; state.y = s[1]; state.dir = s[2];
   state.danger = Math.max(0, state.danger - 20);
-  message = `${floor().name}へ進んだ。`;
+  const key = `intro${to}`;
+  if (FLOORS[to].intro && !state.flags[key]) {
+    state.flags[key] = true;
+    message = FLOORS[to].intro;
+  } else {
+    message = `${floor().name}へ進んだ。`;
+  }
   reveal();
 }
 
@@ -721,7 +737,9 @@ function startBattle(forced = null) {
   };
   if (forced === "boss") sfx.boss(); else sfx.encounter();
   bgm.start();
-  message = `${m.name} ${count}体が現れた！${battle.surprise ? "\n不意を打たれた！" : ""}`;
+  message = forced === "boss"
+    ? BOSS_INTRO
+    : `${m.name} ${count}体が現れた！${battle.surprise ? "\n不意を打たれた！" : ""}`;
   if (m.skill === "trap") {
     const trapLog = [`${m.name}は宝箱に化けていた！罠が炸裂！`];
     const trapDmg = Math.max(8, Math.floor(m.atk * 0.8));
@@ -1001,7 +1019,7 @@ function victory(log) {
   if (battle.id === "boss") {
     sfx.victory();
     mode = "ending";
-    message = "腐敗した勇者アレックスを倒した。玉座の間に、六人の足音だけが残る。";
+    message = "腐敗した勇者アレックスは玉座の前に崩れ落ちた。玉座の間に、六人の足音だけが残る。";
     showEnding();
     return render();
   }
@@ -1452,7 +1470,7 @@ function showTitle() {
   showModal(`
     ${titleImage.complete && titleImage.naturalWidth ? `<img src="img/title.png" alt="タイトル画像">` : ""}
     <h1>サカムビット公の逆襲 第三版</h1>
-    <p>六人の隊列で大迷宮へ潜る、ファミコン版ウィザードリィ寄せの版です。玄室、罠箱、宿屋、寺院、呪文回数、防御値を追加しました。</p>
+    <p>奪われた玉座を取り戻すため、六人の隊列が奈落の城デスフォールへ降りていく。五つの階と、そこに眠る闇を越えて、公は王冠を取り戻せるか。</p>
     <div class="actions">
       <button data-action="new">新しく始める</button>
       <button data-action="load">続きから</button>
@@ -1464,8 +1482,9 @@ function showTitle() {
 function showEnding() {
   showModal(`
     <h1>逆襲、成る</h1>
-    <p>勇者アレックスは倒れ、デスフォールの玉座は再び主を得た。</p>
-    <p>サカムビット公は振り返る。勝利したのは王冠ではなく、六人の隊列だった。</p>
+    <p>勇者アレックスは玉座の前に崩れ落ち、その身は灰となって石床に溶けた。デスフォールの王座は、ついに正統の主を迎えた。</p>
+    <p>だが公は玉座に座らず、ただ振り返る。そこには傷だらけの六人の隊列が、なお肩を並べて立っていた。王冠を取り戻すための戦いは、いつしか隊列を取り戻すための戦いになっていたのだ。</p>
+    <p>……城の外では、夜明けの鐘が鳴り始めている。</p>
     <p class="gold">攻略完了</p>
     <div class="actions"><button data-action="new">もう一度</button><button data-action="close">閉じる</button></div>
   `, true);
