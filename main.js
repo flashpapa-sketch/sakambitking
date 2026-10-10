@@ -2706,6 +2706,17 @@ window.addEventListener("keydown", e => {
   if (isB) command("btn-b");
 });
 
+// 迷宮画面を表示領域いっぱい（3:2を保ったまま）に拡大
+function fitCanvas() {
+  const view = canvas.parentElement;
+  const w = view.clientWidth - 4, h = view.clientHeight - 4;
+  const cw = Math.max(240, Math.floor(Math.min(w, h * 1.5)));
+  canvas.style.width = cw + "px";
+  canvas.style.height = Math.floor(cw / 1.5) + "px";
+}
+new ResizeObserver(fitCanvas).observe(canvas.parentElement);
+fitCanvas();
+
 function loop() {
   drawScene();
   requestAnimationFrame(loop);
