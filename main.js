@@ -4,6 +4,9 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const partyEl = document.getElementById("party");
 const metaEl = document.getElementById("meta");
+const miniMapPanelEl = document.getElementById("miniMapPanel");
+const miniMapCanvas = document.getElementById("miniMap");
+const miniCtx = miniMapCanvas.getContext("2d");
 const msgEl = document.getElementById("message");
 const commandsEl = document.getElementById("commands");
 const touchEl = document.getElementById("touchControls");
@@ -1528,6 +1531,7 @@ function drawScene() {
   frame += 1;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  miniMapPanelEl.hidden = mode === "title";
   if (mode === "title") return drawTitle();
   drawDungeon();
   drawMiniMap();
@@ -1774,16 +1778,19 @@ function drawTileHint() {
 function drawMiniMap() {
   const f = floor();
   const seen = state.seen[`f${state.floor}`] || {};
-  const size = 9, ox = 960 - f.map[0].length * size - 18, oy = 640 - f.map.length * size - 18;
-  ctx.fillStyle = "rgba(0,0,0,.8)";
-  ctx.fillRect(ox - 7, oy - 7, f.map[0].length * size + 14, f.map.length * size + 14);
+  // 右上パネル（#miniMap）に描画
+  const size = 12, w = f.map[0].length * size, h = f.map.length * size;
+  if (miniMapCanvas.width !== w) miniMapCanvas.width = w;
+  if (miniMapCanvas.height !== h) miniMapCanvas.height = h;
+  miniCtx.fillStyle = "#000";
+  miniCtx.fillRect(0, 0, w, h);
   for (let y = 0; y < f.map.length; y++) for (let x = 0; x < f.map[y].length; x++) {
     if (!seen[`${x},${y}`]) continue;
-    ctx.fillStyle = tileAt(x, y, f) === "#" ? "#333" : "#17351f";
-    ctx.fillRect(ox + x * size, oy + y * size, size - 1, size - 1);
+    miniCtx.fillStyle = tileAt(x, y, f) === "#" ? "#333" : "#17351f";
+    miniCtx.fillRect(x * size, y * size, size - 1, size - 1);
   }
-  ctx.fillStyle = "#ff6666";
-  ctx.fillRect(ox + state.x * size + 1, oy + state.y * size + 1, size - 2, size - 2);
+  miniCtx.fillStyle = "#ff6666";
+  miniCtx.fillRect(state.x * size + 1, state.y * size + 1, size - 2, size - 2);
 }
 
 function drawBattle() {

@@ -120,6 +120,25 @@
     font-size: 14px;
   }
 
+  #side {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  #miniMapPanel {
+    padding: 6px;
+  }
+
+  #miniMapPanel[hidden] { display: none; }
+
+  #miniMap {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+  }
+
   #bottom {
     min-height: 0;
     display: grid;
@@ -240,6 +259,8 @@
     #party { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 5px; gap: 4px; }
     .member { min-height: 45px; font-size: 11px; }
     #meta { text-align: left; font-size: 12px; padding: 6px 8px; }
+    #side { grid-template-columns: minmax(0, 1fr) 104px; align-items: start; }
+    #miniMapPanel { padding: 3px; }
     #bottom { grid-template-columns: 1fr; gap: 6px; padding: 0 5px 5px; }
     #message { font-size: 13px; padding: 8px; }
     #commands { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px; gap: 5px; }
@@ -254,7 +275,10 @@
     <canvas id="gameCanvas" width="960" height="640" tabindex="0"></canvas>
     <div id="hud">
       <div id="party" class="panel"></div>
-      <div id="meta" class="panel"></div>
+      <div id="side">
+        <div id="meta" class="panel"></div>
+        <div id="miniMapPanel" class="panel" aria-label="地図"><canvas id="miniMap" width="228" height="228"></canvas></div>
+      </div>
     </div>
     <div id="touchControls" aria-label="タッチ操作">
       <div class="touch-dpad">
