@@ -2691,10 +2691,12 @@ overlayEl.addEventListener("click", e => {
 window.addEventListener("keydown", e => {
   if (e.isComposing || e.keyCode === 229) return;
   if (overlayEl.classList.contains("show") && e.key === "Escape") return closeModal();
+  // テンキー1/2は NumLock オフ時に End/ArrowDown として届くため、矢印判定より先に処理
+  if (e.code === "Numpad1" || e.code === "Numpad2") { e.preventDefault(); command(e.code === "Numpad1" ? "btn-a" : "btn-b"); return; }
   const dir = { ArrowUp: "forward", ArrowDown: "back", ArrowLeft: "left", ArrowRight: "right" };
   if (mode === "explore" && dir[e.key]) { e.preventDefault(); command(dir[e.key]); return; }
-  // WASD: W=前進 / A=左を向く / D=右を向く / S=後ろを向く（その場で反転）
-  const wasd = { KeyW: "forward", KeyA: "left", KeyD: "right", KeyS: "turnback" };
+  // W=前進 / A=左を向く / D=右を向く / X=後ろを向く（その場で反転）
+  const wasd = { KeyW: "forward", KeyA: "left", KeyD: "right", KeyX: "turnback" };
   if (mode === "explore" && wasd[e.code] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); command(wasd[e.code]); return; }
   const isA = e.key === "z" || e.key === "Z" || e.key === "Enter" || e.key === " ";
   const isB = e.key === "x" || e.key === "X" || e.key === "Escape";
