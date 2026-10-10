@@ -1524,6 +1524,8 @@ function renderCommands() {
   if (mode === "gameover") list = [["新規","new"],["ロード","load"],["説明","help"]];
   if (mode === "ending")  list = [["新規","new"],["ロード","load"]];
   if (mode === "title") list = [["新規","new"],["ロード","load"],["説明","help"]];
+  // 探索中は下段のコマンドボタンを隠し、メッセージ欄を全幅にする
+  commandsEl.parentElement.classList.toggle("no-commands", mode === "explore");
   commandsEl.innerHTML = list.map(([label, cmd]) => `<button data-cmd="${cmd}">${label}</button>`).join("");
 }
 
