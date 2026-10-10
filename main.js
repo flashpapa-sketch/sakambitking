@@ -461,6 +461,7 @@ let message = "";
 let frame = 0;
 let _recruitPending = null;
 let _hitFlash = 0;
+let _shake = 0;
 let _dark = 0;
 let _noSpell = 0;
 const titleImage = new Image();
@@ -814,7 +815,7 @@ function attackRound(log) {
     const crit = p.cls === "samurai" && Math.random() < 0.08 + p.lv * 0.01;
     const dmg = crit ? e.hp : Math.max(1, atkOf(p) + rand(1, 6) + Math.floor(p.lv * 1.6) - Math.max(-2, e.ac));
     e.hp = Math.max(0, e.hp - dmg);
-    _hitFlash = 1.0;
+    _hitFlash = 1.0; _shake = 1.0;
     log.push(`${p.name}の攻撃。${e.name}に${dmg}ダメージ${crit ? "。首を刎ねた！" : "。"}`);
   }
 }
@@ -875,7 +876,7 @@ function applySpell(caster, spell, log) {
     for (const e of targets) {
       const dmg = Math.max(3, spell.power + Math.floor(caster.int * 1.2) + rand(-5, 8) - Math.max(0, e.ac));
       e.hp = Math.max(0, e.hp - dmg);
-      _hitFlash = 1.0;
+      _hitFlash = 1.0; _shake = 1.0;
       log.push(`${caster.name}の${spell.name}。${e.name}に${dmg}ダメージ。`);
     }
   }
@@ -1555,7 +1556,10 @@ function renderCommands() {
 const VW = 960, VH = 640;
 function drawScene() {
   frame += 1;
-  ctx.setTransform(canvas.width / VW, 0, 0, canvas.height / VH, 0, 0);
+  const sx = _shake > 0 ? (Math.random() - 0.5) * 14 * _shake : 0;
+  const sy = _shake > 0 ? (Math.random() - 0.5) * 10 * _shake : 0;
+  _shake = Math.max(0, _shake - 0.08);
+  ctx.setTransform(canvas.width / VW, 0, 0, canvas.height / VH, sx * canvas.width / VW, sy * canvas.height / VH);
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, VW, VH);
   miniMapPanelEl.hidden = mode === "title";
@@ -1831,6 +1835,12 @@ function drawBattle() {
   ctx.font = (isBoss ? "bold " : "") + "26px 'MS Gothic', monospace";
   ctx.fillText(enemies[0]?.name || "敵", 480, 192);
   const sprY = 286 + Math.round(Math.sin(frame / 38) * 2);
+  const glow = 0.18 + 0.06 * Math.sin(frame / 20);
+  const gg = ctx.createRadialGradient(480, sprY + 48, 4, 480, sprY + 48, 120);
+  gg.addColorStop(0, `rgba(255,220,140,${glow.toFixed(3)})`);
+  gg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = gg;
+  ctx.fillRect(340, sprY - 70, 280, 240);
   drawMonsterGlyph(battle.id, 480, sprY);
   // Hit flash
   if (_hitFlash > 0) {
