@@ -21,6 +21,15 @@
   #help { position: fixed; left: 14px; bottom: 22px; font-size: 13px; color: #a89f86; line-height: 1.6; }
   #back { position: fixed; top: 92px; left: 14px; font-size: 14px; color: #d9b65f; padding: 6px 12px; text-decoration: none; }
   #fade { position: fixed; inset: 0; background: #000; pointer-events: none; opacity: 1; transition: opacity .9s; }
+  #party { position: fixed; top: 132px; left: 14px; padding: 8px 14px; width: 244px; font-size: 14px; }
+  .bar { height: 9px; background: #1a0d08; border: 1px solid rgba(217,182,95,.4); margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #8a1a10, #e0503a); transition: width .25s; }
+  #pbar > i { background: linear-gradient(90deg, #1f6b3a, #58ff9a); }
+  #battle { position: fixed; top: 16%; left: 50%; transform: translateX(-50%); padding: 10px 22px; text-align: center; display: none; min-width: 300px; }
+  #battle .name { font-size: 24px; color: #ffb0a0; letter-spacing: .1em; }
+  #battle .hint { font-size: 13px; color: #c9bfa4; margin-top: 6px; }
+  #dmg { position: fixed; left: 50%; top: 42%; transform: translate(-50%, 0); font-size: 46px; font-weight: bold; color: #fff2c0;
+    text-shadow: 0 0 12px #ff8a30, 0 2px 0 #000; pointer-events: none; opacity: 0; }
   #touch { position: fixed; right: 14px; bottom: 120px; display: none; gap: 6px; grid-template-columns: repeat(3, 56px); }
   #touch button { height: 56px; font-size: 22px; color: #f4ecd0; background: rgba(0,0,0,.6); border: 1px solid rgba(244,236,208,.5); border-radius: 8px; }
   @media (max-width: 820px), (pointer: coarse) {
@@ -43,10 +52,14 @@
 <a id="back" class="panel" href="./">← 通常版へ戻る</a>
 <div id="mapPanel" class="panel"><canvas id="map" width="190" height="190"></canvas></div>
 <div id="msg" class="panel"></div>
+<div id="party" class="panel">隊列の体力 <span id="php"></span><div class="bar" id="pbar"><i></i></div></div>
+<div id="battle" class="panel"><div class="name" id="bname"></div><div class="bar" id="bbar"><i></i></div><div class="hint">Z・Enter：攻撃　Esc：退く</div></div>
+<div id="dmg"></div>
 <div id="help">W：前進　A：左を向く　D：右を向く　X：振り返る　矢印キーも可</div>
 <div id="touch">
   <span></span><button data-c="forward">▲</button><span></span>
   <button data-c="left">◀</button><button data-c="turn">↻</button><button data-c="right">▶</button>
+  <button data-c="attack" style="grid-column: span 2">攻撃</button><button data-c="flee">退く</button>
 </div>
 <div id="fade"></div>
 
@@ -73,6 +86,14 @@ const MONSTER_NAMES = { "001_rat": "大ネズミ", "002_wolf": "黒檻の猟犬"
   "008_hyena": "影の猟犬", "009_rat_elite": "疫病鼠", "010_wolf_elite": "狼の霊魂", "014_gorilla_elite": "泥トロル", "003_boar": "泥の猪" };
 
 const CELL = 2, WALL_H = 2.6, EYE = 1.15;
+// 階ごとの空気：霧の色、燭台の炎の色、壁の色味
+const THEMES = [
+  { fog: 0x050302, flame: 0xffb060, light: 0xff8a30, wall: 0xffffff },
+  { fog: 0x02050a, flame: 0x80c8ff, light: 0x4a9cff, wall: 0xc8d4e8 },
+  { fog: 0x050309, flame: 0xc890ff, light: 0x9a5cff, wall: 0xc4bccc },
+  { fog: 0x070500, flame: 0xffd27a, light: 0xffb340, wall: 0xf0dcb0 },
+  { fog: 0x090101, flame: 0xff6a50, light: 0xff3020, wall: 0xe0b8b0 }
+];
 
 // ===== 描画の土台 =====
 const view = document.getElementById("view");
@@ -217,8 +238,25 @@ const flameTex = glowTexture("rgba(255,250,220,1)", "rgba(255,140,40,.8)");
 const runeTex = glowTexture("rgba(200,240,255,1)", "rgba(80,160,255,.6)");
 const dustTex = glowTexture("rgba(255,230,190,.9)", "rgba(255,200,140,.25)");
 
+// ===== 火花（攻撃が当たった所から飛び散る） =====
+const SP = 260, spGeo = new THREE.BufferGeometry();
+const spPos = new Float32Array(SP * 3), spVel = new Float32Array(SP * 3), spLife = new Float32Array(SP);
+spGeo.setAttribute("position", new THREE.BufferAttribute(spPos, 3));
+const sparks = new THREE.Points(spGeo, new THREE.PointsMaterial({ map: flameTex, color: 0xffd090, size: 0.09, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+sparks.frustumCulled = false;
+let spNext = 0;
+function burst(at, n, spread) {
+  for (let i = 0; i < n; i++) {
+    const k = spNext = (spNext + 1) % SP;
+    spPos.set([at.x, at.y, at.z], k * 3);
+    spVel.set([(Math.random() - 0.5) * spread, Math.random() * spread * 0.9, (Math.random() - 0.5) * spread], k * 3);
+    spLife[k] = 0.5 + Math.random() * 0.5;
+  }
+}
+
 // ===== 状態 =====
-const st = { floor: 0, x: 1, y: 1, dir: 0, seen: {}, busy: false, dead: false };
+const st = { floor: 0, x: 1, y: 1, dir: 0, seen: {}, busy: false, dead: false, hp: 120, maxHp: 120 };
+let battle = null;
 let world = null;              // 現在の階の3D物体
 const torchLight = new THREE.PointLight(0xffc08a, 9, 20, 1.25);
 torchLight.castShadow = true;
@@ -241,6 +279,7 @@ for (let i = 0; i < DUST; i++) {
 dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
 const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ map: dustTex, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
 scene.add(dust);
+scene.add(sparks);
 
 const tile = (x, y) => (FLOORS[st.floor].map[y] || "")[x] || "#";
 const isWall = (x, y) => tile(x, y) === "#";
@@ -250,6 +289,9 @@ const wpos = (x, y) => new THREE.Vector3(x * CELL, 0, y * CELL);
 function buildFloor(fi) {
   if (world) { scene.remove(world.group); world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   const F = FLOORS[fi], H = F.map.length, W = F.map[0].length;
+  const TH = THEMES[fi] || THEMES[0];
+  scene.fog.color.setHex(TH.fog); scene.background.setHex(TH.fog);
+  wallMat.color.setHex(TH.wall);
   const group = new THREE.Group();
   const flames = [], monsters = [], runes = [];
 
@@ -301,9 +343,9 @@ function buildFloor(fi) {
     const px = c.x * CELL + c.d.dx * (CELL / 2 - 0.08), pz = c.y * CELL + c.d.dy * (CELL / 2 - 0.08);
     const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.03, 0.35, 8), sconceMat);
     holder.position.set(px, 1.55, pz); holder.castShadow = true; group.add(holder);
-    const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, color: 0xffb060, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, color: TH.flame, blending: THREE.AdditiveBlending, depthWrite: false }));
     fl.position.set(px, 1.82, pz); fl.scale.set(0.42, 0.6, 1); group.add(fl);
-    const pl = new THREE.PointLight(0xff8a30, 9, 7, 1.8);
+    const pl = new THREE.PointLight(TH.light, 9, 7, 1.8);
     pl.position.set(px - c.d.dx * 0.25, 1.8, pz - c.d.dy * 0.25); group.add(pl);
     flames.push({ fl, pl, seed: Math.random() * 100 });
   }
@@ -328,7 +370,29 @@ function buildFloor(fi) {
       for (const m of [body, lid, band]) { m.castShadow = true; m.receiveShadow = true; chest.add(m); }
       chest.position.set(p.x, 0, p.z); group.add(chest);
     }
-    if (ch === "E" || ch === "K" || ch === "B") {
+    if (ch === "B") {
+      const throne = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({ color: 0x2a2224, roughness: 0.55, metalness: 0.2 });
+      const gold = new THREE.MeshStandardMaterial({ color: 0xc8a040, roughness: 0.25, metalness: 1, emissive: 0x2a1800 });
+      const cloth = new THREE.MeshStandardMaterial({ color: 0x7a0c10, roughness: 0.9 });
+      const parts = [
+        [new THREE.BoxGeometry(1.3, 0.45, 1.0), stone, 0, 0.22, 0],
+        [new THREE.BoxGeometry(1.3, 2.2, 0.22), stone, 0, 1.1, -0.45],
+        [new THREE.BoxGeometry(0.18, 0.75, 0.9), stone, -0.6, 0.62, 0],
+        [new THREE.BoxGeometry(0.18, 0.75, 0.9), stone, 0.6, 0.62, 0],
+        [new THREE.BoxGeometry(1.0, 0.06, 0.75), cloth, 0, 0.48, 0.05],
+        [new THREE.BoxGeometry(0.9, 1.5, 0.04), cloth, 0, 1.15, -0.33],
+        [new THREE.BoxGeometry(1.42, 0.08, 0.3), gold, 0, 2.2, -0.45],
+        [new THREE.ConeGeometry(0.12, 0.35, 8), gold, -0.5, 2.42, -0.45],
+        [new THREE.ConeGeometry(0.16, 0.5, 8), gold, 0, 2.5, -0.45],
+        [new THREE.ConeGeometry(0.12, 0.35, 8), gold, 0.5, 2.42, -0.45]
+      ];
+      for (const [geo, mat, x, y, z] of parts) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; throne.add(m); }
+      throne.position.set(p.x, 0, p.z); throne.rotation.y = 0; group.add(throne);
+      const red = new THREE.PointLight(0xff2010, 14, 9, 1.6); red.position.set(p.x, 2.2, p.z + 0.8); group.add(red);
+      flames.push({ fl: new THREE.Object3D(), pl: red, seed: 3 });
+    }
+    if (ch === "E" || ch === "K") {
       const col = ch === "E" ? 0x9fe0ff : ch === "K" ? 0xffd27a : 0xff6060;
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: runeTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false }));
       s.position.set(p.x, 1.0, p.z); s.scale.set(0.7, 0.7, 1); group.add(s); runes.push(s);
@@ -344,12 +408,13 @@ function buildFloor(fi) {
   for (const [x, y] of floorsCells.filter(([x, y]) => Math.abs(x - start[0]) + Math.abs(y - start[1]) > 5).slice(0, 6)) {
     const file = MONSTER_FILES[Math.floor(Math.random() * MONSTER_FILES.length)];
     const tex = loader.load(`img/monsters/${file}.png`); tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.35, roughness: 0.8, side: THREE.DoubleSide });
+    const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0x000000, transparent: true, alphaTest: 0.35, roughness: 0.8, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), mat);
     mesh.position.set(x * CELL, 0.85, y * CELL); mesh.castShadow = true;
     mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.35 });
     group.add(mesh);
-    monsters.push({ mesh, x, y, name: MONSTER_NAMES[file], seed: Math.random() * 100 });
+    const hp = 18 + fi * 14 + Math.floor(Math.random() * 10);
+    monsters.push({ mesh, x, y, name: MONSTER_NAMES[file], seed: Math.random() * 100, hp, max: hp, flash: 0, dying: 0, lunge: 0 });
   }
 
   scene.add(group);
@@ -406,6 +471,8 @@ function finishAnim() {
 }
 function act(c) {
   if (st.busy) return;
+  if (battle) { if (c === "attack" || c === "forward") attack(); else if (c === "flee") flee(); return; }
+  if (c === "attack" || c === "flee") return;
   // 描画が重い環境でも操作が詰まらないよう、時間が過ぎていれば前の動きを完了させる
   if (anim.t < 1) {
     if ((performance.now() - anim.start) / 1000 < anim.dur) return;
@@ -424,11 +491,8 @@ function act(c) {
   if (c === "forward") {
     const d = DIRS[st.dir], nx = st.x + d.dx, ny = st.y + d.dy;
     if (isWall(nx, ny)) { say("冷たい石壁だ。"); bump(); return; }
-    const mon = world.monsters.find(m => m.x === nx && m.y === ny && m.mesh.visible);
-    if (mon) {
-      say(`${mon.name}が立ちはだかる！　（戦いは通常版で。試作版では怪物は退いていく）`);
-      mon.mesh.visible = false; hurt(); return;
-    }
+    const mon = world.monsters.find(m => m.x === nx && m.y === ny && m.mesh.visible && !m.dying);
+    if (mon) { startBattle(mon); return; }
     st.x = nx; st.y = ny;
     startAnim(0.26); anim.to.set(nx * CELL, EYE, ny * CELL); anim.yaw1 = anim.yaw0;
     reveal();
@@ -442,10 +506,77 @@ function act(c) {
   }
 }
 let hurtT = 0; function hurt() { hurtT = 1; }
+let shakeT = 0;
+function updateParty() {
+  document.getElementById("php").textContent = `${st.hp} / ${st.maxHp}`;
+  document.querySelector("#pbar > i").style.width = `${Math.max(0, st.hp / st.maxHp * 100)}%`;
+}
+function updateBattle() {
+  const el = document.getElementById("battle");
+  if (!battle) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  document.getElementById("bname").textContent = battle.mon.name;
+  document.querySelector("#bbar > i").style.width = `${Math.max(0, battle.mon.hp / battle.mon.max * 100)}%`;
+}
+function popDamage(n, color) {
+  const el = document.getElementById("dmg");
+  el.textContent = n; el.style.color = color || "#fff2c0";
+  el.animate([{ opacity: 0, transform: "translate(-50%, 20px) scale(.6)" }, { opacity: 1, transform: "translate(-50%, 0) scale(1.15)", offset: 0.25 }, { opacity: 0, transform: "translate(-50%, -40px) scale(1)" }], { duration: 900, easing: "ease-out" });
+}
+function startBattle(mon) {
+  battle = { mon, lock: false };
+  // 怪物が一歩前に出てくる
+  mon.lunge = 1;
+  say(`${mon.name}が立ちはだかる！`, true);
+  updateBattle();
+}
+function attack() {
+  if (!battle || battle.lock) return;
+  battle.lock = true;
+  const m = battle.mon;
+  const crit = Math.random() < 0.15;
+  const dmg = Math.floor((10 + Math.random() * 9) * (crit ? 2 : 1));
+  m.hp -= dmg; m.flash = 1; shakeT = crit ? 1 : 0.6;
+  const at = m.mesh.position.clone(); at.y = 1.0;
+  burst(at, crit ? 120 : 70, crit ? 5 : 3.2);
+  popDamage(crit ? `会心 ${dmg}` : dmg, crit ? "#ffe066" : "#fff2c0");
+  say(crit ? `会心の一撃！ ${m.name}に${dmg}の傷を負わせた。` : `${m.name}に${dmg}の傷を負わせた。`, true);
+  updateBattle();
+  if (m.hp <= 0) {
+    m.dying = 1; burst(at, 160, 2.2);
+    setTimeout(() => { say(`${m.name}を倒した。闇の奥で、何かが崩れる音がした。`); battle = null; updateBattle(); }, 500);
+    return;
+  }
+  setTimeout(() => enemyTurn(m), 650);
+}
+function enemyTurn(m) {
+    if (!battle) return;
+    m.lunge = 1;
+    const hit = Math.random() < 0.75;
+    if (hit) {
+      const d = Math.floor(4 + Math.random() * (6 + st.floor * 3));
+      st.hp = Math.max(0, st.hp - d); hurt(); shakeT = 0.8; popDamage(`−${d}`, "#ff7060");
+      say(`${m.name}の反撃！ 隊列は${d}の傷を負った。`, true);
+    } else say(`${m.name}の反撃は空を切った。`, true);
+    updateParty();
+    if (st.hp <= 0) {
+      say("隊列は倒れた……。意識が遠のき、気がつくと階の入口に戻っていた。", true);
+      battle = null; updateBattle();
+      setTimeout(() => { st.hp = st.maxHp; updateParty(); enterFloor(st.floor); }, 1600);
+      return;
+    }
+    battle.lock = false;
+}
+function flee() {
+  if (!battle || battle.lock) return;
+  if (Math.random() < 0.7) { say("隊列は身を引いた。怪物は追ってこない。"); battle = null; updateBattle(); }
+  else { battle.lock = true; say("退こうとしたが、回り込まれた！", true); setTimeout(() => enemyTurn(battle.mon), 500); }
+}
 let bumpT = 0; function bump() { bumpT = 1; }
 
 addEventListener("keydown", e => {
-  const map = { KeyW: "forward", ArrowUp: "forward", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyX: "turn", ArrowDown: "turn" };
+  const map = { KeyW: "forward", ArrowUp: "forward", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyX: "turn", ArrowDown: "turn",
+    KeyZ: "attack", Enter: "attack", Space: "attack", Numpad1: "attack", Escape: "flee", Numpad2: "flee" };
   const c = map[e.code]; if (c) { e.preventDefault(); act(c); }
 });
 document.querySelectorAll("#touch button").forEach(b => b.addEventListener("pointerdown", e => { e.preventDefault(); act(b.dataset.c); }));
@@ -492,6 +623,22 @@ function tick() {
     camera.position.y = EYE + (moving ? Math.sin(k * Math.PI) * 0.06 : 0);
     if (anim.t >= 1) camera.rotation.y = yawOf(st.dir);
   }
+  // 火花
+  for (let i = 0; i < SP; i++) {
+    if (spLife[i] <= 0) { spPos[i * 3 + 1] = -99; continue; }
+    spLife[i] -= dt;
+    spVel[i * 3 + 1] -= 9 * dt;
+    spPos[i * 3] += spVel[i * 3] * dt; spPos[i * 3 + 1] += spVel[i * 3 + 1] * dt; spPos[i * 3 + 2] += spVel[i * 3 + 2] * dt;
+    if (spPos[i * 3 + 1] < 0.02) { spPos[i * 3 + 1] = 0.02; spVel[i * 3 + 1] *= -0.35; }
+  }
+  spGeo.attributes.position.needsUpdate = true;
+  // 打撃の揺れ
+  if (shakeT > 0) {
+    camera.position.x = anim.to.x + (Math.random() - 0.5) * 0.06 * shakeT;
+    camera.position.y = EYE + (Math.random() - 0.5) * 0.05 * shakeT;
+    shakeT = Math.max(0, shakeT - dt * 3);
+    if (shakeT === 0) { camera.position.x = anim.to.x; camera.position.y = EYE; }
+  }
   // 壁にぶつかった時の小さな揺れ
   if (bumpT > 0) { camera.position.x += (Math.random() - 0.5) * 0.03 * bumpT; bumpT = Math.max(0, bumpT - dt * 4); }
   // 松明のゆらぎ
@@ -503,8 +650,22 @@ function tick() {
     }
     for (const r of world.runes) r.material.opacity = 0.6 + Math.sin(time * 2.2) * 0.3;
     for (const m of world.monsters) {
+      if (!m.mesh.visible) continue;
+      const home = new THREE.Vector3(m.x * CELL, 0, m.y * CELL);
+      const toCam = new THREE.Vector3(camera.position.x - home.x, 0, camera.position.z - home.z);
+      const dist = toCam.length(); toCam.normalize();
+      m.lunge = Math.max(0, m.lunge - dt * 3);
+      const off = Math.sin(m.lunge * Math.PI) * 0.3;
+      m.mesh.position.set(home.x + toCam.x * Math.min(off, Math.max(0, dist - 1.4)), 0.85 + Math.sin(time * 1.6 + m.seed) * 0.03, home.z + toCam.z * Math.min(off, Math.max(0, dist - 1.4)));
       m.mesh.lookAt(camera.position.x, m.mesh.position.y, camera.position.z);
-      m.mesh.position.y = 0.85 + Math.sin(time * 1.6 + m.seed) * 0.03;
+      m.flash = Math.max(0, m.flash - dt * 4);
+      m.mesh.material.emissive.setScalar(m.flash * 1.6);
+      if (m.dying) {
+        m.dying = Math.max(0, m.dying - dt * 1.4);
+        m.mesh.material.opacity = m.dying; m.mesh.material.alphaTest = 0.35 + (1 - m.dying) * 0.6;
+        m.mesh.scale.set(1 + (1 - m.dying) * 0.25, 1 - (1 - m.dying) * 0.5, 1);
+        if (m.dying <= 0) m.mesh.visible = false;
+      }
     }
   }
   // 塵をプレイヤーの周りに漂わせる
@@ -536,7 +697,7 @@ addEventListener("resize", () => {
 
 // 開始
 st.x = FLOORS[0].start[0]; st.y = FLOORS[0].start[1]; st.dir = FLOORS[0].start[2];
-buildFloor(0); placeCamera(); reveal();
+buildFloor(0); placeCamera(); reveal(); updateParty();
 say("序章。奪われた玉座を取り戻すため、六人の隊列は奈落の城デスフォールへ降りていく。――立体試作版");
 setTimeout(() => { document.getElementById("fade").style.opacity = 0; }, 200);
 window.__ready = true;
