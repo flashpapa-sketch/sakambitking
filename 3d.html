@@ -35,7 +35,15 @@
   @media (max-width: 820px), (pointer: coarse) {
     #help { display: none; }
     #touch { display: grid; }
-    #map { width: 120px; height: 120px; }
+    #map { width: 96px; height: 96px; }
+    #mapPanel { top: 10px; right: 10px; padding: 5px; }
+    #hudTop { top: 10px; left: 10px; padding: 7px 10px; max-width: calc(100% - 136px); }
+    #floorName { font-size: 16px; }
+    #pos { font-size: 12px; }
+    #back { top: 74px; left: 10px; font-size: 12px; padding: 4px 8px; }
+    #party { top: 106px; left: 10px; width: 180px; font-size: 12px; padding: 6px 10px; }
+    #battle { top: 22%; min-width: 0; width: calc(100% - 28px); }
+    #touch button { font-size: 18px; white-space: nowrap; }
     #msg { bottom: 300px; font-size: 15px; }
   }
 </style>
@@ -388,8 +396,8 @@ function buildFloor(fi) {
         [new THREE.ConeGeometry(0.12, 0.35, 8), gold, 0.5, 2.42, -0.45]
       ];
       for (const [geo, mat, x, y, z] of parts) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; throne.add(m); }
-      throne.position.set(p.x, 0, p.z); throne.rotation.y = 0; group.add(throne);
-      const red = new THREE.PointLight(0xff2010, 14, 9, 1.6); red.position.set(p.x, 2.2, p.z + 0.8); group.add(red);
+      throne.position.set(p.x, 0, p.z); throne.rotation.y = -Math.PI / 2; group.add(throne);
+      const red = new THREE.PointLight(0xff2010, 14, 9, 1.6); red.position.set(p.x - 0.8, 2.2, p.z); group.add(red);
       flames.push({ fl: new THREE.Object3D(), pl: red, seed: 3 });
     }
     if (ch === "E" || ch === "K") {
