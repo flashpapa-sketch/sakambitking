@@ -462,6 +462,8 @@ let frame = 0;
 let _recruitPending = null;
 let _hitFlash = 0;
 let _shake = 0;
+let _slash = 0;
+let _sparks = [];
 let _dark = 0;
 let _noSpell = 0;
 const titleImage = new Image();
@@ -730,7 +732,9 @@ function startBattle(forced = null) {
   const count = forced === "boss" ? 1 : rand(m.group[0], m.group[1]);
   const ambush = m.skill === "ambush";
   const hasThief = state.party.some(p => p.cls === "thief" && p.hp > 0);
+  _sparks = [];
   battle = {
+    t0: frame,
     id,
     round: 1,
     surprise: Math.random() < (ambush ? (hasThief ? 0.35 : 0.72) : (hasThief ? 0.04 : 0.12)),
@@ -815,7 +819,7 @@ function attackRound(log) {
     const crit = p.cls === "samurai" && Math.random() < 0.08 + p.lv * 0.01;
     const dmg = crit ? e.hp : Math.max(1, atkOf(p) + rand(1, 6) + Math.floor(p.lv * 1.6) - Math.max(-2, e.ac));
     e.hp = Math.max(0, e.hp - dmg);
-    _hitFlash = 1.0; _shake = 1.0;
+    _hitFlash = 1.0; _shake = 1.0; _slash = 1.0; spawnSparks();
     log.push(`${p.name}の攻撃。${e.name}に${dmg}ダメージ${crit ? "。首を刎ねた！" : "。"}`);
   }
 }
@@ -876,7 +880,7 @@ function applySpell(caster, spell, log) {
     for (const e of targets) {
       const dmg = Math.max(3, spell.power + Math.floor(caster.int * 1.2) + rand(-5, 8) - Math.max(0, e.ac));
       e.hp = Math.max(0, e.hp - dmg);
-      _hitFlash = 1.0; _shake = 1.0;
+      _hitFlash = 1.0; _shake = 1.0; _slash = 1.0; spawnSparks();
       log.push(`${caster.name}の${spell.name}。${e.name}に${dmg}ダメージ。`);
     }
   }
@@ -1699,6 +1703,16 @@ function drawDungeon() {
   ctx.font = "17px 'MS Gothic', monospace";
   ctx.fillStyle = rgba(wc, 0.72); ctx.textAlign = "right";
   ctx.fillText(DN[ri] + " ►", bcx + 154, bcy - 1);
+  // 松明の光が当たる壁の明るさ（揺らぎ付き）
+  const torch = 0.05 + 0.02 * Math.sin(frame / 9) + 0.01 * Math.sin(frame / 3.1);
+  const tl = ctx.createLinearGradient(0, 0, W * 0.5, 0);
+  tl.addColorStop(0, `rgba(255,160,60,${torch.toFixed(3)})`);
+  tl.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = tl; ctx.fillRect(0, 0, W, H);
+  const tr = ctx.createLinearGradient(W, 0, W * 0.5, 0);
+  tr.addColorStop(0, `rgba(255,160,60,${torch.toFixed(3)})`);
+  tr.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = tr; ctx.fillRect(0, 0, W, H);
   // Torch flicker — warm radial gradient pulsing at center (torch always in ROM)
   const flicker = 0.04 + 0.015 * Math.sin(frame / 19) + 0.008 * Math.sin(frame / 7);
   const tg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.58);
@@ -1821,6 +1835,20 @@ function drawMiniMap() {
   miniCtx.fillRect(state.x * size + 1, state.y * size + 1, size - 2, size - 2);
 }
 
+function spawnSparks() {
+  for (let i = 0; i < 26; i++) {
+    const max = 22 + Math.random() * 18;
+    _sparks.push({
+      x: 480 + (Math.random() - 0.5) * 60,
+      y: 300 + (Math.random() - 0.5) * 60,
+      vx: (Math.random() - 0.5) * 7,
+      vy: -Math.random() * 6,
+      life: max, max,
+      c: Math.random() < 0.6 ? "#ffd27a" : "#ffffff"
+    });
+  }
+}
+
 function drawBattle() {
   const enemies = liveEnemies();
   const isBoss = battle.id === "boss";
@@ -1841,7 +1869,32 @@ function drawBattle() {
   gg.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = gg;
   ctx.fillRect(340, sprY - 70, 280, 240);
+  const appear = Math.min(1, (frame - (battle.t0 || 0)) / 24);
+  ctx.globalAlpha = appear;
   drawMonsterGlyph(battle.id, 480, sprY);
+  ctx.globalAlpha = 1;
+  // 斬撃の光（左上から右下へ走る白い筋）
+  if (_slash > 0) {
+    ctx.save();
+    ctx.globalAlpha = _slash;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 6 * _slash + 1;
+    ctx.shadowColor = "#ffe9a0"; ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(360, 230 + 40 * (1 - _slash)); ctx.lineTo(600, 360 - 40 * (1 - _slash));
+    ctx.stroke();
+    ctx.restore();
+    _slash = Math.max(0, _slash - 0.09);
+  }
+  // 火花
+  for (const sp of _sparks) {
+    sp.x += sp.vx; sp.y += sp.vy; sp.vy += 0.25; sp.life -= 1;
+    ctx.globalAlpha = Math.max(0, sp.life / sp.max);
+    ctx.fillStyle = sp.c;
+    ctx.fillRect(sp.x, sp.y, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+  _sparks = _sparks.filter(sp => sp.life > 0);
   // Hit flash
   if (_hitFlash > 0) {
     ctx.globalAlpha = _hitFlash * 0.55;
