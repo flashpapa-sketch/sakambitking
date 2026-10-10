@@ -54,7 +54,7 @@
     display: grid;
     /* 迷宮画面を最大化：上段=迷宮+右列(状態・地図)、下段=パーティ・メッセージ・コマンド */
     grid-template-columns: 540px minmax(0, 1fr) 240px;
-    grid-template-rows: minmax(0, 1fr) 136px;
+    grid-template-rows: minmax(0, 1fr) 272px;
     grid-template-areas:
       "view view side"
       "party msg cmd";
@@ -147,10 +147,10 @@
   #message {
     grid-area: msg;
     min-height: 0;
-    padding: 10px 12px;
+    padding: 14px 18px;
     color: var(--green);
-    font-size: 16px;
-    line-height: 1.45;
+    font-size: 20px;
+    line-height: 1.7;
     white-space: pre-line;
     overflow: auto;
   }
