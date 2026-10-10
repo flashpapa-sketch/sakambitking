@@ -1532,10 +1532,13 @@ function renderCommands() {
   commandsEl.innerHTML = list.map(([label, cmd]) => `<button data-cmd="${cmd}">${label}</button>`).join("");
 }
 
+// 論理座標は 960×640 固定。実際の表示サイズの解像度で描き、文字（漢字）を潰さない
+const VW = 960, VH = 640;
 function drawScene() {
   frame += 1;
+  ctx.setTransform(canvas.width / VW, 0, 0, canvas.height / VH, 0, 0);
   ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, VW, VH);
   miniMapPanelEl.hidden = mode === "title";
   if (mode === "title") return drawTitle();
   drawDungeon();
@@ -1547,13 +1550,13 @@ function drawScene() {
 
 function drawTitle() {
   if (titleImage.complete && titleImage.naturalWidth) {
-    ctx.drawImage(titleImage, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(titleImage, 0, 0, VW, VH);
     ctx.fillStyle = "rgba(0,0,0,.52)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, VW, VH);
   }
   // Star field
   for (let i = 0; i < 48; i++) {
-    const sx = (i * 139 + frame * ((i % 3) + 1) * 0.25) % canvas.width;
+    const sx = (i * 139 + frame * ((i % 3) + 1) * 0.25) % VW;
     const sy = (i * 167) % 260;
     const bright = 0.25 + 0.45 * Math.sin(frame / 22 + i);
     ctx.fillStyle = `rgba(244,236,208,${bright.toFixed(2)})`;
@@ -1573,7 +1576,7 @@ function drawTitle() {
 }
 
 function drawDungeon() {
-  const W = canvas.width, H = canvas.height;
+  const W = VW, H = VH;
   const wc = floor().color;
   ctx.fillStyle = "#050403";
   ctx.fillRect(0, 0, W, H);
@@ -2735,8 +2738,13 @@ function fitCanvas() {
   const w = view.clientWidth - 4, h = view.clientHeight - 4;
   const VIEW_SCALE = 0.8; // 迷宮画面の大きさ（表示領域に対する割合）
   const cw = Math.max(240, Math.floor(Math.min(w, h * 1.5) * VIEW_SCALE));
+  const ch = Math.floor(cw / 1.5);
   canvas.style.width = cw + "px";
-  canvas.style.height = Math.floor(cw / 1.5) + "px";
+  canvas.style.height = ch + "px";
+  // 描画解像度を表示サイズ×画面密度に合わせる（縮小による文字の崩れを防ぐ）
+  const dpr = window.devicePixelRatio || 1;
+  const bw = Math.round(cw * dpr), bh = Math.round(ch * dpr);
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
 }
 new ResizeObserver(fitCanvas).observe(canvas.parentElement);
 fitCanvas();
