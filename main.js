@@ -2640,6 +2640,7 @@ function command(cmd) {
   if (cmd === "back") move(-1);
   if (cmd === "left") rotate(-1);
   if (cmd === "right") rotate(1);
+  if (cmd === "turnback") rotate(2);
   if (cmd === "inspect") inspect();
   if (cmd === "camp") showCamp();
   if (cmd === "map") showMap();
@@ -2690,6 +2691,9 @@ window.addEventListener("keydown", e => {
   if (overlayEl.classList.contains("show") && e.key === "Escape") return closeModal();
   const dir = { ArrowUp: "forward", ArrowDown: "back", ArrowLeft: "left", ArrowRight: "right" };
   if (mode === "explore" && dir[e.key]) { e.preventDefault(); command(dir[e.key]); return; }
+  // WASD: W=前進 / A=左を向く / D=右を向く / S=後ろを向く（その場で反転）
+  const wasd = { KeyW: "forward", KeyA: "left", KeyD: "right", KeyS: "turnback" };
+  if (mode === "explore" && wasd[e.code] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); command(wasd[e.code]); return; }
   const isA = e.key === "z" || e.key === "Z" || e.key === "Enter" || e.key === " ";
   const isB = e.key === "x" || e.key === "X" || e.key === "Escape";
   if (!isA && !isB) return;
