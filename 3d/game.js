@@ -249,6 +249,45 @@ const flameTex = glowTexture("rgba(255,250,220,1)", "rgba(255,140,40,.8)");
 const runeTex = glowTexture("rgba(200,240,255,1)", "rgba(80,160,255,.6)");
 const dustTex = glowTexture("rgba(255,230,190,.9)", "rgba(255,200,140,.25)");
 
+// ドット絵を「Scale2x」で3回拡大（24→192）し、輪郭をなめらかにしてから陰影と縁取りを付ける
+function scale2x(src, W, H) {
+  const dst = new Array(W * 2 * H * 2), at = (x, y) => src[Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+    let e0 = P, e1 = P, e2 = P, e3 = P;
+    if (C === A && C !== D && A !== B) e0 = A;
+    if (A === B && A !== C && B !== D) e1 = B;
+    if (D === C && D !== B && C !== A) e2 = C;
+    if (B === D && B !== A && D !== C) e3 = D;
+    const o = (y * 2) * W * 2 + x * 2;
+    dst[o] = e0; dst[o + 1] = e1; dst[o + W * 2] = e2; dst[o + W * 2 + 1] = e3;
+  }
+  return dst;
+}
+function spriteCanvas(id) {
+  const spr = SPRITES[id] || SPRITES.skeleton, rows = spr.d, H0 = rows.length, W0 = rows[0].length;
+  let px = [];
+  for (let r = 0; r < H0; r++) for (let c = 0; c < W0; c++) { const ch = rows[r][c]; px.push(ch === "." || ch === "0" ? 0 : parseInt(ch, 16)); }
+  let W = W0, H = H0;
+  for (let i = 0; i < 3; i++) { px = scale2x(px, W, H); W *= 2; H *= 2; }
+  const pad = 8, c = document.createElement("canvas"); c.width = W + pad * 2; c.height = H + pad * 2;
+  const g = c.getContext("2d"), img = g.createImageData(W, H);
+  const rgb = hex => { const n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = px[y * W + x], k = (y * W + x) * 4; if (!v || !spr.p[v]) continue;
+    const [r, gg, b] = rgb(spr.p[v]);
+    const shade = 1.12 - (y / H) * 0.38;   // 上から光が当たったような陰影
+    img.data[k] = Math.min(255, r * shade); img.data[k + 1] = Math.min(255, gg * shade); img.data[k + 2] = Math.min(255, b * shade); img.data[k + 3] = 255;
+  }
+  // 縁取り（暗い輪郭）を先に描き、その上に本体を重ねる
+  const tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; tmp.getContext("2d").putImageData(img, 0, 0);
+  g.filter = "brightness(0) opacity(0.85)";
+  for (const [dx, dy] of [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [2, 2], [-2, 2], [2, -2]]) g.drawImage(tmp, pad + dx, pad + dy);
+  g.filter = "none";
+  g.drawImage(tmp, pad, pad);
+  return c;
+}
+
 // 敵の絵（用意された絵があれば使い、なければ通常版のドット絵から作る）
 const texCache = {};
 const loader = new THREE.TextureLoader();
@@ -258,16 +297,8 @@ function monsterTexture(id) {
   if (MONSTER_ART[id]) {
     tex = loader.load(`img/monsters/${MONSTER_ART[id]}.png`);
   } else {
-    const spr = SPRITES[id] || SPRITES.skeleton, rows = spr.d, H = rows.length, W = rows[0].length, ps = 8;
-    const c = document.createElement("canvas"); c.width = W * ps; c.height = H * ps;
-    const g = c.getContext("2d");
-    for (let r = 0; r < H; r++) for (let col = 0; col < W; col++) {
-      const ch = rows[r][col]; if (ch === "." || ch === "0") continue;
-      const color = spr.p[parseInt(ch, 16)]; if (!color) continue;
-      g.fillStyle = color; g.fillRect(col * ps, r * ps, ps, ps);
-    }
-    tex = new THREE.CanvasTexture(c);
-    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
+    tex = new THREE.CanvasTexture(spriteCanvas(id));
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
   }
   tex.colorSpace = THREE.SRGBColorSpace;
   texCache[id] = tex;
