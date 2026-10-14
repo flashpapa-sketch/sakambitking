@@ -1900,5 +1900,6 @@ tick();
 window.__g = { get state() { return state; }, set state(v) { state = v; }, get mode() { return mode; }, set mode(v) { mode = v; }, get battle() { return battle; }, get busy() { return busy; },
   get chest() { return chest; }, get dark() { return dark; }, get noSpell() { return noSpell; }, FLOORS, MONSTERS, ITEMS, EQUIPMENT,
   startBattle, act, changeFloor, startNew, playerRound, gainRare, completion, checkAch, sp, equipBest, bookPct, RARES, SIGILS, ACHIEVEMENTS, chestAction, action, campMenu, town, loadGame, saveGame, liveEnemies, living, handleEvent,
-  msg: () => $("msg").textContent, modalText: () => $("modal").classList.contains("hidden") ? "" : $("modalBox").innerText,
+  msg: () => $("msg").textContent, get audioState() { return { ctx: audio.ctx?.state || "none", song: music.key, on: music.on }; },
+  fps() { return new Promise(res => { let n = 0; const t0 = performance.now(); (function f() { n++; if (performance.now() - t0 < 2000) requestAnimationFrame(f); else res(Math.round(n / 2)); })(); }); }, modalText: () => $("modal").classList.contains("hidden") ? "" : $("modalBox").innerText,
   tp(x, y, d) { state.x = x; state.y = y; state.dir = d; placeCamera(); reveal(); renderHud(); } };
