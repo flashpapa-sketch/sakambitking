@@ -81,6 +81,8 @@
   #title .acts button { min-width: 150px; font-size: 18px; padding: 10px 18px; }
   #title .note { margin-top: 16px; font-size: 13px; color: var(--dim); }
 
+  #toasts { position: fixed; top: 128px; right: 12px; display: grid; gap: 6px; z-index: 60; pointer-events: none; }
+  .toast { padding: 8px 16px; font-size: 16px; letter-spacing: .06em; border-width: 1px; border-style: solid; text-shadow: 0 0 10px currentColor; }
   #fade { position: fixed; inset: 0; background: #000; pointer-events: none; opacity: 1; transition: opacity .8s; z-index: 45; }
   #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 3; }
 
@@ -116,7 +118,7 @@
 <div id="flash"></div>
 <div id="foes"></div>
 <div id="hudTop" class="panel"><div id="floorName"></div><div id="status"></div></div>
-<div id="help" class="panel">W 前進 ／ A・D 向きを変える ／ X 振り返る<br>Z・Enter 調べる・決定 ／ C 野営 ／ M 地図</div>
+<div id="help" class="panel">W 前進 ／ A・D 向きを変える ／ X 振り返る<br>Z・Enter 調べる・決定・階段 ／ C 野営 ／ M 地図</div>
 <div id="mapPanel" class="panel" title="地図を広げる（M）"><canvas id="map" width="190" height="190"></canvas></div>
 <div id="battleTitle" class="panel hidden"></div>
 <div id="msg" class="panel"></div>
@@ -141,6 +143,7 @@
     <div class="note">音が出ます。　<a href="./" style="color:var(--gold)">通常版へ</a></div>
   </div>
 </div>
+<div id="toasts"></div>
 <div id="fade"></div>
 <script type="module" src="3d/game.js"></script>
 </body>

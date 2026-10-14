@@ -19,7 +19,7 @@ function str(name) {
   return JSON.parse(m[1]);
 }
 
-const names = ["CLASSES", "partyTemplate", "EQUIPMENT", "ITEMS", "SPELLS", "CHESTS", "MONSTERS", "FLOORS"];
+const names = ["CLASSES", "partyTemplate", "EQUIPMENT", "ITEMS", "SPELLS", "CHESTS", "MONSTERS", "FLOORS", "NAMED_ALLIES"];
 const data = {};
 for (const n of names) data[n] = new Function(`return (${block(n)});`)();
 const _D = new Function(`return (${block("_D")});`)();

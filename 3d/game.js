@@ -6,7 +6,15 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO } from "./data.js";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js";
+
+// 立体版の追加要素を通常版のデータに合流させる
+Object.assign(EQUIPMENT, RARES);
+Object.assign(MONSTERS, EXTRA_MONSTERS);
+CHESTS.abyss = ABYSS_CHEST;
+if (FLOORS.length === 5) FLOORS.push(ABYSS_FLOOR);
+FLOORS[4].events["17,17"] = { type: "abyssGate" };
 
 // ================================================================
 // 基本設定
@@ -19,7 +27,8 @@ const THEMES = [
   { fog: 0x02050a, flame: 0x80c8ff, light: 0x4a9cff, wall: 0xc8d4e8, drone: 49 },
   { fog: 0x050309, flame: 0xc890ff, light: 0x9a5cff, wall: 0xc4bccc, drone: 46 },
   { fog: 0x070500, flame: 0xffd27a, light: 0xffb340, wall: 0xf0dcb0, drone: 52 },
-  { fog: 0x090101, flame: 0xff6a50, light: 0xff3020, wall: 0xe0b8b0, drone: 41 }
+  { fog: 0x090101, flame: 0xff6a50, light: 0xff3020, wall: 0xe0b8b0, drone: 41 },
+  { fog: 0x06020a, flame: 0xb070ff, light: 0x8a40ff, wall: 0xb4a4c8, drone: 33 }
 ];
 // 絵が用意されている敵（通常版と同じ割り当て）
 const MONSTER_ART = {
@@ -38,7 +47,10 @@ const ENDING_HTML = `
 const $ = id => document.getElementById(id);
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const choose = list => list[Math.floor(Math.random() * list.length)];
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// ?test を付けて開くと、待ち時間と描画を省いた高速確認モードになる（自動テスト用）
+const TEST = new URLSearchParams(location.search).has("test");
+const T = ms => TEST ? 0 : ms;
+const sleep = ms => new Promise(r => setTimeout(r, T(ms)));
 
 // ================================================================
 // 音（すべてその場で合成）
@@ -297,7 +309,7 @@ function monsterTexture(id) {
   if (MONSTER_ART[id]) {
     tex = loader.load(`img/monsters/${MONSTER_ART[id]}.png`);
   } else {
-    tex = new THREE.CanvasTexture(spriteCanvas(id));
+    tex = new THREE.CanvasTexture(spriteCanvas(SPRITE_ALIAS[id] || id));
     tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
   }
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -366,8 +378,15 @@ function makeMember(t) {
 }
 function newState() {
   const s = FLOORS[0].start;
-  return { floor: 0, x: s[0], y: s[1], dir: s[2], gold: 180, steps: 0, danger: 0, flags: { intro0: true }, seen: {},
-    inventory: { potion: 4, ether: 1, antidote: 1, stoneCure: 0, malorScroll: 1 }, stock: {}, party: partyTemplate.map(makeMember) };
+  return fillState({ floor: 0, x: s[0], y: s[1], dir: s[2], gold: 180, steps: 0, danger: 0, flags: { intro0: true }, seen: {},
+    inventory: { potion: 4, ether: 1, antidote: 1, stoneCure: 0, malorScroll: 1 }, stock: {}, party: partyTemplate.map(makeMember) });
+}
+// やりこみ用の記録（古い記録にも足りない項目を補う）
+function fillState(s) {
+  s.cycle ??= 0; s.book ??= {}; s.rares ??= {}; s.sigils ??= {}; s.ach ??= {}; s.reserve ??= []; s.bookRewards ??= {};
+  s.stats = Object.assign({ wins: 0, chests: 0, clears: 0, abyss: false, abyssKills: 0, goldSeen: 0, goldKills: 0, arenaBest: 0,
+    avgLv: 1, maxLv: 1, oneTurn: false, cursed: false, cleanClear: false, maxFloor: 0, steps: 0 }, s.stats || {});
+  return s;
 }
 const F = () => FLOORS[state.floor];
 const tile = (x, y) => (F().map[y] || "")[x] || "#";
@@ -375,7 +394,29 @@ const isWall = (x, y) => tile(x, y) === "#";
 const living = () => state.party.filter(p => p.hp > 0 && !p.dead);
 const frontRow = () => state.party.slice(0, 3).filter(p => p.hp > 0 && !p.dead);
 function acOf(p) { let ac = p.baseAc; for (const id of Object.values(p.equip)) if (id && EQUIPMENT[id]) ac += EQUIPMENT[id].ac; if (p.status.sleep) ac += 3; return ac; }
-const atkOf = p => p.atk + (EQUIPMENT[p.equip.weapon]?.atk || 0);
+const atkOf = p => p.atk + Object.values(p.equip).reduce((a, id) => a + (EQUIPMENT[id]?.atk || 0), 0);
+// 身につけた装備の特性をまとめる
+function sp(p) {
+  const r = { crit: 0, drain: 0, multi: 0, spell: 0, evade: 0, thorns: 0, regen: 0, ward: false, luck: 0, first: false, boss: 0 };
+  for (const id of Object.values(p.equip || {})) {
+    const e = EQUIPMENT[id]?.sp; if (!e) continue;
+    for (const [k, v] of Object.entries(e)) r[k] = typeof v === "boolean" ? (r[k] || v) : r[k] + v;
+  }
+  return r;
+}
+const partyLuck = () => living().reduce((a, p) => a + sp(p).luck, 0);
+const caster = p => !!CLASSES[p.cls]?.spell;
+// 状態異常を与える（守りの装備があれば防ぐ）
+function inflict(p, k, log, text) {
+  if (sp(p).ward && ["poison", "paralyze", "sleep", "burn", "bleed", "slow"].includes(k)) { log.push(`${p.name}は守りの力で${STATUS_LABELS[k] || k}を退けた。`); return; }
+  p.status[k] = k === "sleep" ? 2 : 1; if (text) log.push(text);
+}
+function equipScore(e, p) {
+  if (!e) return 0;
+  const s2 = e.sp || {};
+  return (e.atk || 0) * 1 + -(e.ac || 0) * 1.5 + (s2.crit || 0) * 50 + (s2.multi || 0) * 40 + (s2.drain || 0) * 30 + (s2.spell || 0) * (caster(p) ? 30 : 2)
+    + (s2.evade || 0) * 60 + (s2.thorns || 0) * 20 + (s2.regen || 0) * 3 + (s2.ward ? 6 : 0) + (s2.luck || 0) * 4 + (s2.first ? 5 : 0) + (s2.boss || 0) * 10 - (e.cursed ? 100 : 0);
+}
 const hitRate = (power, ac) => Math.max(0.12, Math.min(0.9, 0.58 + power * 0.018 - ac * 0.035));
 
 // ================================================================
@@ -403,7 +444,7 @@ function renderParty() {
   }).join("");
 }
 function renderHud() {
-  $("floorName").textContent = F().name;
+  $("floorName").textContent = F().name + (state.cycle ? `（${state.cycle + 1}周目）` : "");
   $("status").textContent = `向き ${DIRS[state.dir].n}　所持金 ${state.gold}${dark > 0 ? `　暗闇 残${dark}歩` : ""}${noSpell > 0 ? `　魔封じ 残${noSpell}歩` : ""}`;
   renderParty(); drawMap();
 }
@@ -533,6 +574,12 @@ function buildFloor(fi) {
       chests[`${x},${y}`] = { lidG, shine };
       if (state.flags[`e_${fi}_${x},${y}`]) { lidG.rotation.x = -1.2; shine.visible = false; }
     }
+    if (Fl.events?.[`${x},${y}`]?.type === "abyssGate") {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.7, 4), new THREE.MeshBasicMaterial({ color: 0xa060ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(px, 0.02, pz); group.add(ring);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: runeTex, color: 0xa060ff, blending: THREE.AdditiveBlending, depthWrite: false }));
+      glow.position.set(px, 0.4, pz); glow.scale.set(1.1, 1.1, 1); group.add(glow); runes.push(glow);
+    }
     if (ch === "E" || ch === "K") {
       if (ch === "K" && state.flags.b1Key && fi === 0) continue;
       if (ch === "K" && state.flags.royalSeal && fi === 3) continue;
@@ -555,7 +602,7 @@ function buildFloor(fi) {
         const m = new THREE.Mesh(geo, mat); m.position.set(x2, y2, z2); m.castShadow = true; m.receiveShadow = true; throne.add(m);
       }
       throne.position.set(px, 0, pz); throne.rotation.y = -Math.PI / 2; group.add(throne);
-      const red = new THREE.PointLight(0xff2010, 14, 9, 1.6); red.position.set(px - 0.8, 2.2, pz); group.add(red);
+      const red = new THREE.PointLight(fi === 5 ? 0x9a40ff : 0xff2010, 14, 9, 1.6); red.position.set(px - 0.8, 2.2, pz); group.add(red);
       flames.push({ fl: new THREE.Object3D(), pl: red, seed: 3, base: 14 });
     }
   }
@@ -573,7 +620,7 @@ function placeCamera() {
   camera.rotation.set(0, yawOf(state.dir), 0, "YXZ");
   anim.from.copy(camera.position); anim.to.copy(camera.position); anim.yaw0 = anim.yaw1 = yawOf(state.dir); anim.t = 1;
 }
-function startAnim(dur) { anim.from.copy(camera.position); anim.yaw0 = camera.rotation.y; anim.t = 0; anim.dur = dur; anim.start = performance.now(); }
+function startAnim(dur) { anim.from.copy(camera.position); anim.yaw0 = camera.rotation.y; anim.t = 0; anim.dur = TEST ? 0.0001 : dur; anim.start = performance.now(); }
 function finishAnim() { camera.position.copy(anim.to); camera.position.y = EYE; camera.rotation.y = yawOf(state.dir); anim.t = 1; }
 function turnTo(dir, dur) {
   state.dir = dir; startAnim(dur);
@@ -585,7 +632,8 @@ function turnTo(dir, dur) {
 
 function encounterRate() {
   const thief = state.party.find(p => p.cls === "thief" && p.hp > 0 && !p.dead);
-  return Math.max(0.04, F().encounter + Math.min(0.08, state.danger / 900) - (thief ? 0.015 : 0));
+  // 立体版は一歩の重みが大きいので、通常版より2割ほど遭遇を減らす
+  return Math.max(0.035, (F().encounter + Math.min(0.08, state.danger / 900) - (thief ? 0.015 : 0)) * 0.8);
 }
 function tickStatuses() {
   const log = [];
@@ -594,6 +642,7 @@ function tickStatuses() {
     if (p.status.bleed) { p.hp = Math.max(1, p.hp - 3); log.push(`${p.name}は出血している。`); }
     if (p.status.burn) { p.hp = Math.max(1, p.hp - 4); log.push(`${p.name}は炎に焼かれている。`); if (Math.random() < 0.3) delete p.status.burn; }
     if (p.status.slow && Math.random() < 0.4) delete p.status.slow;
+    const rg = sp(p).regen; if (rg && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + rg);
   }
   return log;
 }
@@ -602,9 +651,13 @@ function moveForward() {
   const d = DIRS[state.dir], nx = state.x + d.dx, ny = state.y + d.dy;
   if (isWall(nx, ny)) { audio.bump(); bumpT = 1; say("冷たい石壁だ。"); return; }
   // 玉座のマスには踏み込まず、その手前で決戦になる
-  if (tile(nx, ny) === "B") { say("玉座の前に立った。冷たい気配が背筋を這い上がる。"); setTimeout(() => startBattle("boss"), 500); return; }
+  if (tile(nx, ny) === "B") {
+    const abyss = state.floor === 5;
+    say(abyss ? "奈落の玉座の前に立った。底の見えない闇が、こちらを見返している。" : "玉座の前に立った。冷たい気配が背筋を這い上がる。");
+    busy = true; setTimeout(() => { busy = false; startBattle(abyss ? "abyss_king" : "boss"); }, T(500)); return;
+  }
   audio.step();
-  state.x = nx; state.y = ny; state.steps++; state.danger += 1 + state.floor;
+  state.x = nx; state.y = ny; state.steps++; state.stats.steps++; state.danger += 1 + Math.min(4, state.floor);
   if (dark > 0) dark--; if (noSpell > 0) noSpell--;
   startAnim(0.26); anim.to.set(nx * CELL, EYE, ny * CELL); anim.yaw1 = anim.yaw0;
   reveal();
@@ -612,7 +665,8 @@ function moveForward() {
   if (log.length) say(log.join("\n"));
   const triggered = handleEvent();
   renderHud();
-  if (!triggered && mode === "explore" && Math.random() < encounterRate()) setTimeout(() => startBattle(), 280);
+  // 遭遇は一拍おいて始める（その間は操作を受け付けない）
+  if (!triggered && mode === "explore" && Math.random() < encounterRate()) { busy = true; setTimeout(() => { busy = false; startBattle(); }, T(280)); }
 }
 
 // ================================================================
@@ -636,7 +690,7 @@ function handleEvent(byInspect = false) {
     case "trapdoor": {
       audio.bump(); for (const p of living()) p.hp = Math.max(1, p.hp - ev.damage); say(ev.text); hurtT = 1;
       const to = Math.min(FLOORS.length - 1, state.floor + 1);
-      if (to !== state.floor) setTimeout(() => changeFloor(to, true), 500);
+      if (to !== state.floor) { busy = true; setTimeout(() => changeFloor(to, true), T(500)); }
       return true;
     }
     case "flag":
@@ -645,18 +699,42 @@ function handleEvent(byInspect = false) {
       break;
     case "rotate": {
       const nd = Math.floor(Math.random() * 4); audio.turn();
-      spinT = 1; spinTarget = nd;
+      if (TEST) state.dir = nd; else { spinT = 1; spinTarget = nd; }
       say(`${ev.text} （向き：${DIRS[nd].n}）`);
       break;
     }
     case "dark": dark = ev.duration || 10; say(ev.text); audio.curse(); break;
     case "spelltrap": noSpell = ev.duration || 6; say(ev.text); audio.curse(); flash("rgba(120,60,200,.6)", 600); break;
-    case "stairs": setTimeout(() => changeFloor(ev.to), 250); return true;
+    case "stairs":
+      if (!byInspect) { say(`${ev.to > state.floor ? "下り" : "上り"}階段がある。（Z・Enter で${ev.to > state.floor ? "下りる" : "上る"}）`); return true; }
+      busy = true; setTimeout(() => changeFloor(ev.to), T(250)); return true;
+    case "abyssGate": {
+      const n = Object.keys(state.sigils).length;
+      if (n < 4) { say(`床に四つの窪みが刻まれている。何かをはめ込む場所のようだ。（秘印 ${n}/4）`); return true; }
+      if (!byInspect) { say("四つの秘印が共鳴し、床の紋様が紫に脈打っている。（Z・Enter で奈落へ降りる）"); return true; }
+      audio.curse(); flash("rgba(150,60,255,.7)", 1200);
+      busy = true; setTimeout(() => changeFloor(5), T(600)); return true;
+    }
+    case "ally": return allyEvent(ev, done);
     case "chest": openChest(CHESTS[ev.table], done, key); return true;
-    case "boss": setTimeout(() => startBattle("boss"), 400); return true;
+    case "boss": busy = true; setTimeout(() => { busy = false; startBattle("boss"); }, T(400)); return true;
   }
   if (ev.once) state.flags[done] = true;
   return false;
+}
+
+function allyEvent(ev, done) {
+  const ally = NAMED_ALLIES[ev.id];
+  if (!ally) return false;
+  if (state.party.some(p => p.id === ev.id) || state.reserve.some(p => p.id === ev.id)) { say(`${ally.name}はもう仲間になっている。`); return false; }
+  if (state.flags[done]) return false;
+  mode = "modal";
+  const opts = state.party.map((p, i) => i === 0 ? "" : `<button data-a="allySwap" data-v="${i}">${p.name}（${p.className}・レベル${p.lv}${p.dead ? "・" + (p.dead === "ashes" ? "灰" : p.dead === "lost" ? "消失" : "死亡") : ""}）と入れ替える</button>`).join("");
+  modal(`<h2>${ally.name}</h2><p>${ally.greeting.join("<br>")}</p>
+    <p class="dim">隊列は六人まで。迎え入れるなら、誰かを入口の酒場で待たせることになる。</p>
+    <div class="acts">${opts}<button data-a="allyNo">断る</button></div>`);
+  state._allyEv = { id: ev.id, done };
+  return true;
 }
 
 function changeFloor(to, fall = false) {
@@ -668,17 +746,21 @@ function changeFloor(to, fall = false) {
     state.floor = to;
     const Fl = FLOORS[to];
     // 階段で移動した時は、戻り階段の上に出る
-    const back = !fall && Object.entries(Fl.events || {}).find(([, e]) => e.type === "stairs" && e.to === from);
+    const back = !fall && (Object.entries(Fl.events || {}).find(([, e]) => e.type === "stairs" && e.to === from)
+      || (from === 5 && Object.entries(Fl.events || {}).find(([, e]) => e.type === "abyssGate")));
     if (back) { const [bx, by] = back[0].split(",").map(Number); state.x = bx; state.y = by; }
     else { state.x = Fl.start[0]; state.y = Fl.start[1]; }
     state.dir = Fl.start[2];
     for (let i = 0; i < 4; i++) { const d = DIRS[state.dir]; if (!isWall(state.x + d.dx, state.y + d.dy)) break; state.dir = (state.dir + 1) % 4; }
     state.danger = Math.max(0, state.danger - 20);
+    state.stats.maxFloor = Math.max(state.stats.maxFloor, to);
+    if (to === 5) state.stats.abyss = true;
     buildFloor(to); placeCamera(); reveal(); renderHud(); audio.ambient(to);
     const key = `intro${to}`;
     if (Fl.intro && !state.flags[key]) { state.flags[key] = true; say(Fl.intro); } else say(`${Fl.name}へ進んだ。`);
-    setTimeout(() => { fade.style.opacity = 0; busy = false; }, 150);
-  }, 700);
+    checkAch();
+    setTimeout(() => { fade.style.opacity = 0; busy = false; }, T(150));
+  }, T(700));
 }
 
 // ================================================================
@@ -711,11 +793,11 @@ function chestAction(a) {
 function springTrap() {
   const trap = choose(["毒針", "石弓", "爆裂", "ガス"]);
   const log = [`罠だ！ ${trap}が作動した。`];
-  if (trap === "毒針") { const p = choose(living()); p.status.poison = 1; damageParty(p, rand(6, 14), log, "毒針"); }
-  else if (trap === "ガス") { for (const p of living()) p.status.sleep = 2; log.push("眠りのガスが広がった。"); }
+  if (trap === "毒針") { const p = choose(living()); inflict(p, "poison", log); damageParty(p, rand(6, 14), log, "毒針"); }
+  else if (trap === "ガス") { log.push("眠りのガスが広がった。"); for (const p of living()) inflict(p, "sleep", log); }
   else { for (const p of living()) damageParty(p, rand(5, 14), log, trap); if (trap === "爆裂") { flash("rgba(255,140,40,.7)", 500); shakeT = 1; } }
   chest.trap = false; audio.hurt(); hurtT = 1;
-  say(log.join("\n")); renderHud();
+  say(log.filter(l => { if (typeof l === "function") { l(); return false; } return true; }).join("\n")); renderHud();
   if (!living().length) gameOver();
 }
 function lootChest() {
@@ -727,49 +809,74 @@ function lootChest() {
     const ceq = EQUIPMENT[t.cursedEquip], victim = choose(living());
     if (victim) {
       const old = victim.equip[ceq.type]; if (old) state.stock[old] = (state.stock[old] || 0) + 1;
-      victim.equip[ceq.type] = t.cursedEquip; victim.cursedSlot = ceq.type; got.push(`${ceq.name}（${victim.name}が呪縛された！）`);
+      victim.equip[ceq.type] = t.cursedEquip; victim.cursedSlot = ceq.type; got.push(`${ceq.name}（${victim.name}が呪縛された！）`); state.stats.cursed = true;
     }
   }
   if (chest.doneFlag) state.flags[chest.doneFlag] = true;
+  state.stats.chests++;
+  const luck = partyLuck();
+  if (t.rare) gainRare(rollRare(state.floor, state.cycle, luck, t.rare));
+  else if (Math.random() < (0.025 + state.floor * 0.01) * (1 + state.cycle * 0.3) * (1 + luck * 0.5)) gainRare(rollRare(state.floor, state.cycle, luck, 1));
   if (chest.cell && world.chests[chest.cell]) { world.chests[chest.cell].lidOpen = true; world.chests[chest.cell].shine.visible = false; }
   const at = chest.cell ? new THREE.Vector3(...[chest.cell.split(",")[0] * CELL, 0.7, chest.cell.split(",")[1] * CELL]) : camera.position.clone().add(new THREE.Vector3(0, -0.4, 0));
   burst(at, 60, 1.6, [1, 0.85, 0.4]);
   closeModal(); mode = "explore";
   say(`${chest.prefix ? chest.prefix + "\n" : ""}宝箱を開けた。${gold}ゴールド${got.length ? "と" + got.join("、") : ""}を得た。`);
-  chest = null; renderHud();
+  chest = null; checkAch(); renderHud();
 }
 
 // ================================================================
 // 戦闘
 // ================================================================
 const foeLabels = $("foes");
-function startBattle(forced = null) {
+function scaled(m, extra = 1) {
+  // 周回・隠し階・試練の強さを掛け合わせる
+  const f = (1 + state.cycle * 0.55) * (F().scale || 1) * extra;
+  const g2 = 1 + (f - 1) * 0.5;
+  return { ...m, hp: Math.round(m.hp * f), atk: Math.round(m.atk * g2), dice: Math.round(m.dice * g2), ac: m.ac - state.cycle,
+    exp: Math.round(m.exp * f), gold: Math.round(m.gold * (1 + (f - 1) * 0.6)) };
+}
+function startBattle(forced = null, opts = {}) {
   if (mode !== "explore") return;
   mode = "battle";
-  const id = forced || choose(F().monsters), m = MONSTERS[id];
-  const count = forced === "boss" ? 1 : rand(m.group[0], m.group[1]);
+  let id = forced || choose(F().monsters);
+  // まれに黄金の亡霊が紛れ込む
+  if (!forced && !opts.arena && Math.random() < 1 / 110) id = "golden_ghost";
+  const boss = forced === "boss" || forced === "abyss_king";
+  const arena = opts.arena != null ? ARENA[opts.arena] : null;
+  const m = scaled(MONSTERS[id], arena ? arena.mult : 1);
+  const count = boss || id === "golden_ghost" ? 1 : arena ? m.group[1] + 1 : rand(m.group[0], m.group[1]);
   const ambush = m.skill === "ambush";
   const hasThief = state.party.some(p => p.cls === "thief" && p.hp > 0 && !p.dead);
+  const first = living().some(p => sp(p).first);
   battle = {
-    id, round: 1, boss: forced === "boss",
-    surprise: Math.random() < (ambush ? (hasThief ? 0.35 : 0.72) : (hasThief ? 0.04 : 0.12)),
+    id, round: 1, boss, arena: opts.arena ?? null,
+    surprise: !first && !boss && Math.random() < (ambush ? (hasThief ? 0.35 : 0.72) : (hasThief ? 0.04 : 0.12)),
+    preempt: first && !boss && Math.random() < 0.3,
     enemies: Array.from({ length: count }, (_, i) => ({ ...m, key: `${id}_${i}`, maxHp: m.hp, hp: m.hp, sleep: 0, silence: 0, weak: 0 })),
     meshes: []
   };
+  // 図鑑：出会った記録
+  (state.book[id] ||= { seen: 0, killed: 0 }).seen++;
+  if (id === "golden_ghost") state.stats.goldSeen++;
   document.body.classList.add("inbattle");
-  if (battle.boss) { audio.boss(); flash("rgba(160,0,0,.6)", 900); } else audio.encounter();
+  if (boss) { audio.boss(); flash(id === "abyss_king" ? "rgba(110,30,200,.7)" : "rgba(160,0,0,.6)", 900); }
+  else if (id === "golden_ghost") { audio.coin(); audio.encounter(); flash("rgba(255,215,90,.6)", 700); }
+  else audio.encounter();
   spawnFoes();
-  $("battleTitle").textContent = battle.boss ? m.name : `${m.name}　${count}体`;
+  $("battleTitle").textContent = boss ? m.name : `${arena ? arena.name + "　" : ""}${m.name}　${count}体`;
   $("battleTitle").classList.remove("hidden");
-  say(battle.boss ? BOSS_INTRO : `${m.name} ${count}体が現れた！${battle.surprise ? "\n不意を打たれた！" : ""}`);
+  say(id === "abyss_king" ? ABYSS_INTRO : forced === "boss" ? BOSS_INTRO
+    : id === "golden_ghost" ? "金色の光が通路を満たした。黄金の亡霊だ！　逃げられる前に仕留めろ！"
+    : `${m.name} ${count}体が現れた！${battle.surprise ? "\n不意を打たれた！" : ""}${battle.preempt ? "\n先手を取った！" : ""}`);
   if (m.skill === "trap") {
     const log = [`${m.name}は宝箱に化けていた！罠が炸裂！`], dmg = Math.max(8, Math.floor(m.atk * 0.8));
     for (const p of living()) damageParty(p, dmg, log, `${m.name}の爆裂罠`);
     flash("rgba(255,140,40,.7)", 500); shakeT = 1;
-    say(log.join("\n"), true); renderHud();
+    say(log.filter(l => typeof l === "string").join("\n"), true); renderHud();
     if (!living().length) return gameOver();
   }
-  if (battle.surprise) { busy = true; setTimeout(async () => { await enemyRound(); busy = false; showCommands(); }, 700); }
+  if (battle.surprise) { busy = true; setTimeout(async () => { await enemyRound(); busy = false; if (mode === "battle") showCommands(); }, T(700)); }
   else showCommands();
 }
 function liveEnemies() { return battle ? battle.enemies.filter(e => e.hp > 0) : []; }
@@ -800,6 +907,7 @@ function spawnFoes() {
     foeLabels.appendChild(label);
     // 明るい色の敵が松明の光で白飛びしないよう、反射を少し抑える
     const tone = battle.boss ? 0.5 : MONSTER_ART[battle.id] ? 0.85 : 0.7;
+    if (battle.id === "golden_ghost") { mat.emissive.setHex(0x553300); }
     battle.meshes.push({ e, mesh, label, base: base.clone(), size, tone, flash: 0, dying: 0, lunge: 0, appear: 0, born: performance.now(), seed: Math.random() * 10 });
   });
 }
@@ -881,8 +989,10 @@ async function playerRound(action, arg = null) {
   if (!liveEnemies().length) { await victory(); busy = false; return; }
   // 倒れた敵の後ろから次の敵が前に出る
   if (battle.meshes.every(m => m.e.hp <= 0) && liveEnemies().length) { await sleep(500); spawnFoes(); say("奥から次の敵が進み出る！", true); await sleep(400); }
-  await enemyRound();
+  if (battle.preempt) { battle.preempt = false; battle.round++; say("敵はまだ身構えていない。", true); }
+  else await enemyRound();
   busy = false;
+  if (battle?.fled) { await sleep(600); endBattle(); return; }
   if (mode === "battle") showCommands();
 }
 
@@ -891,25 +1001,35 @@ function wakeAndPoison() {
     p.guard = 0; if (p.hp <= 0) continue;
     if (p.status.sleep) { p.status.sleep -= 1; if (p.status.sleep <= 0) delete p.status.sleep; }
     if (p.status.poison) p.hp = Math.max(1, p.hp - 3);
+    const rg = sp(p).regen; if (rg && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + rg);
   }
 }
 
 function attackRound(log) {
   const actors = living().sort((a, b) => b.agi - a.agi);
   for (const p of actors) {
-    const e = liveEnemies()[0]; if (!e) break;
+    if (!liveEnemies().length) break;
     if (p.status.sleep) { log.push(`${p.name}は眠っている。`); continue; }
     if (p.status.paralyze) { log.push(`${p.name}は痺れて動けない。`); continue; }
     const row = state.party.indexOf(p) < 3 ? "front" : "back";
     if (!(row === "front" || CLASSES[p.cls]?.spell || CLASSES[p.cls]?.ranged)) { log.push(`${p.name}は後列から届かない。`); continue; }
-    if (Math.random() >= hitRate(p.agi + p.lv * 2, e.ac)) { log.push(() => audio.miss(), `${p.name}の攻撃は外れた。`); continue; }
-    if (e.skill === "guard" && Math.random() < 0.22) { log.push(() => audio.miss(), `${p.name}の攻撃を${e.name}は盾で弾いた。`); continue; }
-    const crit = (p.cls === "samurai" && Math.random() < 0.08 + p.lv * 0.01) || (p.cls === "ninja" && Math.random() < 0.06);
-    const dmg = crit && !battle.boss ? e.hp : Math.max(1, atkOf(p) + rand(1, 6) + Math.floor(p.lv * 1.6) - Math.max(-2, e.ac)) * (crit ? 2 : 1);
-    e.hp = Math.max(0, e.hp - dmg);
-    const dead = e.hp <= 0;
-    log.push(() => fxHit(e, dmg, crit), `${p.name}の攻撃。${e.name}に${dmg}の傷${crit ? "。会心の一撃！" : "。"}`);
-    if (dead) log.push(() => fxDie(e), `${e.name}を倒した。`);
+    const s2 = sp(p);
+    const swings = 1 + (Math.random() < s2.multi ? 1 : 0);
+    for (let k = 0; k < swings; k++) {
+      const e = liveEnemies()[0]; if (!e) break;
+      if (k === 1) log.push(`${p.name}の追撃！`);
+      if (Math.random() >= hitRate(p.agi + p.lv * 2, e.ac)) { log.push(() => audio.miss(), `${p.name}の攻撃は外れた。`); continue; }
+      if (e.skill === "guard" && Math.random() < 0.22) { log.push(() => audio.miss(), `${p.name}の攻撃を${e.name}は盾で弾いた。`); continue; }
+      const crit = (p.cls === "samurai" && Math.random() < 0.08 + p.lv * 0.01) || (p.cls === "ninja" && Math.random() < 0.06) || Math.random() < s2.crit;
+      let dmg = Math.max(1, atkOf(p) + rand(1, 6) + Math.floor(p.lv * 1.6) - Math.max(-2, e.ac)) * (crit ? 2 : 1);
+      if (battle.boss || e.maxHp >= 300) dmg = Math.round(dmg * (1 + s2.boss));
+      if (crit && p.cls === "samurai" && !battle.boss && e.maxHp < 300) dmg = e.hp;   // 侍の首はね（通常版と同じ）
+      e.hp = Math.max(0, e.hp - dmg);
+      const dead = e.hp <= 0;
+      log.push(() => fxHit(e, dmg, crit), `${p.name}の攻撃。${e.name}に${dmg}の傷${crit ? "。会心の一撃！" : "。"}`);
+      if (s2.drain && p.hp < p.maxHp) { const h = Math.max(1, Math.floor(dmg * s2.drain)); p.hp = Math.min(p.maxHp, p.hp + h); log.push(`${p.name}は${h}の命を吸った。`); }
+      if (dead) log.push(() => fxDie(e), `${e.name}を倒した。`);
+    }
   }
 }
 
@@ -937,7 +1057,7 @@ function pray(log) {
 function applySpell(caster, spell, log) {
   if (spell.kind === "heal" || spell.kind === "fullheal") {
     const t = living().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || caster;
-    const heal = spell.kind === "fullheal" ? t.maxHp : spell.power + caster.pie + rand(0, 8);
+    const heal = spell.kind === "fullheal" ? t.maxHp : Math.round((spell.power + caster.pie + rand(0, 8)) * (1 + sp(caster).spell));
     t.hp = Math.min(t.maxHp, t.hp + heal);
     for (const k of ["poison", "paralyze", "bleed", "burn", "slow"]) delete t.status[k];
     log.push(() => fxHeal(t), `${caster.name}は${spell.name}を唱えた。${t.name}の傷が癒えた。`);
@@ -953,7 +1073,7 @@ function applySpell(caster, spell, log) {
     const holy = spell.id === "badios";
     log.push(() => fxSpell(targets, holy ? "holy" : "fire"), `${caster.name}は${spell.name}を唱えた！`);
     for (const e of targets) {
-      const dmg = Math.max(3, spell.power + Math.floor((holy ? caster.pie : caster.int) * 1.2) + rand(-5, 8) - Math.max(0, e.ac));
+      const dmg = Math.round(Math.max(3, spell.power + Math.floor((holy ? caster.pie : caster.int) * 1.2) + rand(-5, 8) - Math.max(0, e.ac)) * (1 + sp(caster).spell));
       e.hp = Math.max(0, e.hp - dmg);
       const dead = e.hp <= 0;
       log.push(() => fxHit(e, dmg, false, true), `${e.name}に${dmg}の傷。`);
@@ -978,48 +1098,60 @@ async function enemyRound() {
   const log = [];
   for (const e of liveEnemies()) {
     if (e.sleep) { e.sleep -= 1; log.push(`${e.name}は眠っている。`); continue; }
+    // 黄金の亡霊は二手目で逃げる
+    if (e.skill === "flee" && battle.round >= 2) {
+      log.push(() => { audio.spell(); fxDie(e); }, `${e.name}は霧のように消えた……。`);
+      battle.fled = true; break;
+    }
     const pool = frontRow().length ? frontRow() : living();
     const target = choose(pool); if (!target) break;
-    if (e.skill === "breath" && Math.random() < 0.28) {
-      const dmg = Math.max(5, Math.floor(e.atk * 0.65));
-      log.push(() => { fxLunge(e); flash("rgba(255,120,30,.6)", 600); audio.fire(); shakeT = 1; }, `${e.name}が炎の息を吐いた！`);
-      for (const p of living()) damageParty(p, dmg, log, `${e.name}のブレス`);
+    const breath = (e.skill === "breath" && Math.random() < 0.28) || (e.skill === "abyss" && Math.random() < 0.3);
+    if (breath) {
+      const dmg = Math.max(5, Math.floor(e.atk * (e.skill === "abyss" ? 0.75 : 0.65)));
+      log.push(() => { fxLunge(e); flash(e.skill === "abyss" ? "rgba(140,60,255,.6)" : "rgba(255,120,30,.6)", 600); audio.fire(); shakeT = 1; },
+        e.skill === "abyss" ? `${e.name}が奈落の吐息を放った！` : `${e.name}が炎の息を吐いた！`);
+      for (const p of living()) damageParty(p, dmg, log, `${e.name}の${e.skill === "abyss" ? "吐息" : "ブレス"}`);
       continue;
     }
-    if (e.skill === "curse" && !e.silence && Math.random() < 0.28) {
-      const v = choose(living()); v.status.paralyze = 1;
-      log.push(() => { audio.curse(); flash("rgba(110,40,180,.55)", 600); }, `${e.name}の呪い。${v.name}は麻痺した。`);
+    if ((e.skill === "curse" && !e.silence && Math.random() < 0.28) || (e.skill === "abyss" && Math.random() < 0.15)) {
+      const v = choose(living());
+      log.push(() => { audio.curse(); flash("rgba(110,40,180,.55)", 600); }, `${e.name}の呪い。`);
+      inflict(v, "paralyze", log, `${v.name}は麻痺した。`);
       continue;
     }
-    if (e.skill === "hero" && Math.random() < 0.32) {
+    if ((e.skill === "hero" && Math.random() < 0.32) || (e.skill === "abyss" && Math.random() < 0.35)) {
       log.push(() => { fxLunge(e); audio.boss(); }, `${e.name}の怒涛の連撃！`);
-      for (let h = 0; h < 3; h++) { const t = choose(frontRow().length ? frontRow() : living()); if (!t) break; damageParty(t, Math.max(1, e.dice + rand(1, 6) - Math.floor(acOf(t) / 2)), log, `${e.name}の連撃`); }
+      for (let h = 0; h < 3; h++) { const t = choose(frontRow().length ? frontRow() : living()); if (!t) break; damageParty(t, Math.max(1, e.dice + rand(1, 6) - Math.floor(acOf(t) / 2)), log, `${e.name}の連撃`, e); }
       continue;
     }
     if (Math.random() >= hitRate(e.atk, acOf(target))) { log.push(() => { fxLunge(e); audio.miss(); }, `${e.name}の攻撃は外れた。`); continue; }
+    if (Math.random() < sp(target).evade) { log.push(() => { fxLunge(e); audio.miss(); }, `${target.name}は身をかわした。`); continue; }
     let dmg = Math.max(1, e.dice + rand(1, 8) - Math.floor(acOf(target) / 2) - (e.weak || 0));
     if (e.skill === "slam" && Math.random() < 0.25) dmg = Math.floor(dmg * 1.7);
     log.push(() => fxLunge(e));
-    damageParty(target, dmg, log, `${e.name}の攻撃`);
-    if (e.skill === "poison" && target.hp > 0 && Math.random() < 0.35) { target.status.poison = 1; log.push(`${target.name}は毒を受けた。`); }
+    damageParty(target, dmg, log, `${e.name}の攻撃`, e);
+    if (target.hp > 0) {
+      if (e.skill === "poison" && Math.random() < 0.35) inflict(target, "poison", log, `${target.name}は毒を受けた。`);
+      if (e.skill === "bleed" && Math.random() < 0.3) inflict(target, "bleed", log, `${target.name}は出血した。`);
+      if (e.skill === "burn" && Math.random() < 0.3) inflict(target, "burn", log, `${target.name}は炎上した。`);
+      if (e.skill === "freeze" && Math.random() < 0.25) inflict(target, "paralyze", log, `${target.name}は凍りついた。`);
+      if (e.skill === "slow" && Math.random() < 0.3) inflict(target, "slow", log, `${target.name}は鈍化した。`);
+      if (e.skill === "acid" && Math.random() < 0.25) inflict(target, "poison", log, `${target.name}は酸を浴びた。`);
+    }
     if (e.skill === "drain" && target.hp > 0 && Math.random() < 0.25) {
       e.hp = Math.min(e.maxHp, e.hp + Math.floor(dmg / 2)); log.push(`${e.name}は生命力を吸った。`);
-      if (target.lv > 1 && Math.random() < 0.2) { target.lv--; target.exp = 0; target.maxHp = Math.max(1, target.maxHp - rand(2, 5)); target.hp = Math.min(target.hp, target.maxHp); log.push(() => audio.curse(), `${target.name}はレベルを奪われた！（レベル${target.lv}）`); }
+      if (target.lv > 1 && Math.random() < 0.2 && !sp(target).ward) { target.lv--; target.exp = 0; target.maxHp = Math.max(1, target.maxHp - rand(2, 5)); target.hp = Math.min(target.hp, target.maxHp); log.push(() => audio.curse(), `${target.name}はレベルを奪われた！（レベル${target.lv}）`); }
     }
     if (e.skill === "mirror" && Math.random() < 0.35) { const r = choose(living()); if (r) damageParty(r, Math.max(1, Math.floor(dmg * 0.5)), log, `${e.name}の反射`); }
-    if (e.skill === "bleed" && target.hp > 0 && Math.random() < 0.3) { target.status.bleed = 1; log.push(`${target.name}は出血した。`); }
-    if (e.skill === "burn" && target.hp > 0 && Math.random() < 0.3) { target.status.burn = 1; log.push(`${target.name}は炎上した。`); }
-    if (e.skill === "freeze" && target.hp > 0 && Math.random() < 0.25) { target.status.paralyze = 1; log.push(`${target.name}は凍りついた。`); }
-    if (e.skill === "slow" && target.hp > 0 && Math.random() < 0.3) { target.status.slow = 1; log.push(`${target.name}は鈍化した。`); }
-    if (e.skill === "acid" && target.hp > 0 && Math.random() < 0.25) { target.status.poison = 1; log.push(`${target.name}は酸を浴びた。`); }
   }
   await play(log);
-  renderHud();
+  renderHud(); updateFoeLabels();
   if (!living().length) return gameOver();
+  if (battle && !battle.fled && !liveEnemies().length) return victory();   // 棘の鎧の反撃で倒れた場合
   if (battle) battle.round++;
 }
 
-function damageParty(p, amount, log, source) {
+function damageParty(p, amount, log, source, attacker = null) {
   const dmg = Math.max(1, Math.floor(amount * (p.guard ? 0.45 : 1)));
   p.hp = Math.max(0, p.hp - dmg);
   const i = state.party.indexOf(p);
@@ -1028,6 +1160,12 @@ function damageParty(p, amount, log, source) {
     const brutal = dmg >= p.maxHp * 0.75 || source.includes("連撃") || source.includes("ブレス");
     p.dead = brutal && Math.random() < 0.28 ? "ashes" : "dead";
     log.push(p.dead === "ashes" ? `${p.name}の遺体は灰と化した……` : `${p.name}は倒れた。`);
+  }
+  const th = sp(p).thorns;
+  if (th && attacker && attacker.hp > 0) {
+    const r = Math.max(1, Math.floor(dmg * th)); attacker.hp = Math.max(0, attacker.hp - r);
+    log.push(() => fxHit(attacker, r, false), `棘が${attacker.name}を貫いた。${r}の傷。`);
+    if (attacker.hp <= 0) log.push(() => fxDie(attacker), `${attacker.name}を倒した。`);
   }
 }
 
@@ -1044,28 +1182,122 @@ function levelUp(p, log) {
 }
 
 async function victory() {
-  const exp = battle.enemies.reduce((s, e) => s + e.exp, 0);
-  const gold = battle.enemies.reduce((s, e) => s + e.gold, 0) + rand(0, 40);
-  if (battle.boss) {
+  if (!battle || battle.won) return;
+  battle.won = true;
+  const id = battle.id, killed = battle.enemies.filter(e => e.hp <= 0);
+  const rec = (state.book[id] ||= { seen: 1, killed: 0 }); rec.killed += killed.length;
+  state.stats.wins++;
+  if (battle.round === 1 && battle.enemies.length >= 4) state.stats.oneTurn = true;
+  const luck = partyLuck();
+  const exp = killed.reduce((s2, e) => s2 + e.exp, 0);
+  const gold = Math.round((killed.reduce((s2, e) => s2 + e.gold, 0) + rand(0, 40)) * (1 + luck * 0.15) * (battle.arena != null ? 2 : 1));
+
+  if (id === "boss") {
     audio.victory();
+    state.stats.clears++;
+    if (state.party.every(p => !p.dead && p.hp > 0)) state.stats.cleanClear = true;
     await play(["腐敗した勇者アレックスは玉座の前に崩れ落ちた。玉座の間に、六人の足音だけが残る。"]);
+    if (state.cycle >= 1) gainRare(rollRare(4, state.cycle, luck, 3));
+    checkAch();
     await sleep(1600);
     endBattle(); mode = "ending";
-    modal(`${ENDING_HTML}<div class="acts"><button data-a="newGame">もう一度</button><button data-a="toTitle">表題へ</button></div>`);
+    const sig = Object.keys(state.sigils).length;
+    modal(`${ENDING_HTML}<p class="dim">${state.cycle + 1}周目の攻略。やりこみ度 ${completion()}%${sig < 4 ? `　（秘印 ${sig}/4 ── この城には、まだ底がある）` : ""}</p>
+      <div class="acts"><button data-a="nextCycle">次の周回へ（強さを引き継ぐ）</button><button data-a="stay">この周回に残る</button><button data-a="toTitle">表題へ</button></div>`);
+    return;
+  }
+  if (id === "abyss_king") {
+    audio.victory(); state.stats.abyssKills++;
+    await play([ABYSS_END]);
+    gainRare("voidCutter"); gainRare("abyssHeart");
+    state.gold += gold; for (const p of living()) { p.exp += exp; levelUp(p, []); }
+    checkAch();
+    await sleep(1200);
+    endBattle(); mode = "modal";
+    modal(`<h1>奈落、鎮まる</h1><p>奈落の王の玉座が崩れ、底の見えなかった闇に、初めて底が見えた。</p>
+      <p>公は崩れた玉座の欠片を拾い上げる。そこには、まだ誰も読んだことのない物語の続きが刻まれていた。</p>
+      <p class="gold">隠しボス撃破　やりこみ度 ${completion()}%</p><div class="acts"><button data-a="close">闇の中へ戻る</button></div>`);
     return;
   }
   audio.victory();
   state.gold += gold;
   const log = [];
   for (const p of living()) { p.exp += exp; levelUp(p, log); }
-  log.unshift(`勝利。経験値${exp}と${gold}ゴールドを得た。`);
+  log.unshift(id === "golden_ghost" ? `黄金の亡霊を討ち取った！　経験値${exp}と${gold}ゴールドを得た。` : `勝利。経験値${exp}と${gold}ゴールドを得た。`);
   await play(log);
+  // レア装備：倒した数だけ判定（1回の戦闘で2つまで）
+  let drops = 0;
+  if (id === "golden_ghost") { state.stats.goldKills++; gainRare(rollRare(state.floor, state.cycle, luck, 2)); drops++; }
+  if (!drops) { const r = rollRare(state.floor, state.cycle, luck, 0, killed.length); if (r) gainRare(r); }
+  // 試練の間の報酬
+  if (battle.arena != null) {
+    const t = ARENA[battle.arena];
+    state.stats.arenaBest = Math.max(state.stats.arenaBest, battle.arena + 1);
+    if (Math.random() < t.rare) gainRare(rollRare(t.floor, state.cycle, luck, t.minTier || 1));
+  }
+  // 秘印：その階の決まった敵が、ごくまれに落とす
+  for (const [k, sg] of Object.entries(SIGILS)) {
+    if (state.sigils[k] || sg.holder !== id) continue;
+    if (Math.random() < 0.06 * (1 + luck * 0.5) * killed.length) {
+      state.sigils[k] = true;
+      say(`${sg.name}を手に入れた！　古い紋様が、かすかに紫に光っている。（秘印 ${Object.keys(state.sigils).length}/4）`, true);
+      audio.levelup(); flash("rgba(170,90,255,.55)", 900); toast(`秘印　${sg.name}`, "#c890ff");
+    }
+  }
+  bookRewards();
+  checkAch();
   renderHud();
-  const hasChest = Math.random() < 0.45;
+  const hasChest = battle.arena == null && id !== "golden_ghost" && Math.random() < 0.45;
   await sleep(500);
   endBattle();
   if (hasChest) openChest(CHESTS.battle, null, null, "敵の残した宝箱がある。");
 }
+
+// ---- レア装備・図鑑・称号 ----
+function gainRare(id) {
+  if (!id || !RARES[id]) return;
+  const r = RARES[id];
+  state.stock[id] = (state.stock[id] || 0) + 1;
+  const isNew = !state.rares[id];
+  state.rares[id] = (state.rares[id] || 0) + 1;
+  say(`${TIER_NAMES[r.tier]}の品「${r.name}」を手に入れた！${isNew ? "（秘宝目録に記録）" : ""}`, true);
+  toast(`${TIER_NAMES[r.tier]}　${r.name}`, TIER_COLORS[r.tier]);
+  audio.levelup(); audio.coin();
+  flash(r.tier === 3 ? "rgba(255,215,120,.7)" : r.tier === 2 ? "rgba(200,140,255,.5)" : "rgba(130,180,255,.45)", r.tier === 3 ? 1200 : 700);
+}
+const bookTotal = () => Object.keys(MONSTERS).length;
+const bookCount = () => Object.values(state.book).filter(b => b.killed > 0).length;
+const bookPct = () => Math.floor(bookCount() / bookTotal() * 100);
+function bookRewards() {
+  const pct = bookPct();
+  for (const [th, id] of [[25, "mageOrb"], [50, "oldSeal"], [75, "undyingPlate"], [100, "bardCrown"]]) {
+    if (pct >= th && !state.bookRewards[th]) { state.bookRewards[th] = true; say(`怪物図鑑が${th}%に達した。記録の褒美が届いた。`, true); gainRare(id); }
+  }
+}
+function completion() {
+  const a = bookPct(), b = Math.floor(Object.keys(state.rares).length / Object.keys(RARES).length * 100);
+  const c = Math.floor(Object.keys(state.ach).length / ACHIEVEMENTS.length * 100);
+  return Math.floor((a + b + c) / 3);
+}
+function checkAch() {
+  if (!state) return;
+  const liv = state.party.filter(p => !p.dead);
+  state.stats.avgLv = liv.length ? liv.reduce((x, p) => x + p.lv, 0) / liv.length : 1;
+  state.stats.maxLv = Math.max(...state.party.map(p => p.lv));
+  const view = { ...state, bookPct: bookPct() };
+  for (const a of ACHIEVEMENTS) {
+    if (state.ach[a.id]) continue;
+    let ok = false; try { ok = a.check(view, RARES); } catch {}
+    if (ok) { state.ach[a.id] = Date.now(); toast(`称号「${a.name}」`, "#ffd27a"); }
+  }
+}
+function toast(text, color = "#ffd27a") {
+  const box = $("toasts"); if (!box) return;
+  const el = document.createElement("div"); el.className = "toast panel"; el.textContent = text; el.style.borderColor = color; el.style.color = color;
+  box.appendChild(el);
+  el.animate([{ opacity: 0, transform: "translateY(-10px)" }, { opacity: 1, transform: "none", offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: T(4200) || 1, easing: "ease-out" }).onfinish = () => el.remove();
+}
+
 function endBattle() {
   if (battle) for (const m of battle.meshes) scene.remove(m.mesh);
   battle = null; foeLabels.innerHTML = ""; document.body.classList.remove("inbattle");
@@ -1075,6 +1307,12 @@ function endBattle() {
   renderHud();
 }
 function gameOver() {
+  if (battle?.arena != null) {
+    busy = false; endBattle(); mode = "modal";
+    state.party.forEach(p => { if (!p.dead || p.dead === "dead") { p.dead = undefined; p.hp = Math.max(1, p.hp); } });
+    town("試練に敗れた。審判役の老人が、気を失った隊列を運び出してくれた。");
+    renderHud(); return;
+  }
   busy = false; endBattle(); mode = "dead";
   audio.curse();
   modal(`<h1 class="red">全滅</h1><p>六人の灯は闇に呑まれた。寺院に運び込む者もいない。</p>
@@ -1112,7 +1350,7 @@ function fxSpell(targets, kind) {
 // ================================================================
 // 窓（野営・町・宝箱・表題）
 // ================================================================
-function modal(html) { $("modalBox").innerHTML = html; $("modal").classList.remove("hidden"); }
+function modal(html) { $("modalBox").innerHTML = html; $("modalBox").dataset.from = ""; $("modal").classList.remove("hidden"); $("modalBox").scrollTop = 0; }
 function closeModal() { $("modal").classList.add("hidden"); }
 $("modalBox").addEventListener("click", e => { const b = e.target.closest("button[data-a]"); if (b) { audio.init(); action(b.dataset.a, b.dataset.v); } });
 
@@ -1120,30 +1358,118 @@ function campMenu(note = "") {
   if (mode !== "explore") return;
   mode = "modal";
   const atEntrance = state.floor === 0 && state.x === FLOORS[0].start[0] && state.y === FLOORS[0].start[1];
-  const rows = state.party.map(p => `<div class="dim">${p.name}（${p.className}・レベル${p.lv}）体力 ${p.hp}/${p.maxHp}　防御${acOf(p)}　攻撃${atkOf(p)}${p.maxMp.some(v => v) ? `　呪文${p.mp.join("/")}` : ""}${p.dead ? `　<span class="red">${p.dead === "ashes" ? "灰" : p.dead === "lost" ? "消失" : "死亡"}</span>` : ""}　経験${p.exp}/${p.lv * 85}</div>`).join("");
+  const rows = state.party.map((p, i) => `<div class="dim">${p.name}（${p.className}・レベル${p.lv}）体力 ${p.hp}/${p.maxHp}　防御${acOf(p)}　攻撃${atkOf(p)}${p.maxMp.some(v => v) ? `　呪文${p.mp.join("/")}` : ""}${p.dead ? `　<span class="red">${p.dead === "ashes" ? "灰" : p.dead === "lost" ? "消失" : "死亡"}</span>` : ""}　経験${p.exp}/${p.lv * 85}</div>`).join("");
   const items = Object.entries(ITEMS).filter(([id]) => (state.inventory[id] || 0) > 0)
     .map(([id, it]) => `<button data-a="useItem" data-v="${id}">${it.name}×${state.inventory[id]}</button>`).join("");
-  modal(`<h2>野営</h2>${note ? `<p class="gold">${note}</p>` : ""}${rows}
-    <p>所持金 ${state.gold}ゴールド</p>
+  modal(`<h2>野営</h2>${note ? `<p class="gold" style="white-space:pre-line">${note}</p>` : ""}${rows}
+    <p>所持金 ${state.gold}ゴールド　${state.cycle ? `${state.cycle + 1}周目　` : ""}秘印 ${Object.keys(state.sigils).length}/4　やりこみ度 <span class="gold">${completion()}%</span></p>
     <div class="acts">${items || '<span class="dim">道具はない</span>'}</div>
     <div class="acts">
       ${atEntrance ? '<button data-a="town">町へ入る</button>' : ""}
-      <button data-a="equipBest">装備を整える</button>
+      <button data-a="equipMenu">装備</button>
+      <button data-a="equipBest">おまかせ装備</button>
       <button data-a="swapRow">隊列を入れ替える</button>
+      <button data-a="book">怪物図鑑</button>
+      <button data-a="rareList">秘宝目録</button>
+      <button data-a="achList">称号</button>
       <button data-a="save">記録する</button>
       <button data-a="close">閉じる</button>
     </div>`);
 }
 function town(note = "") {
-  mode = "modal";
-  const innCost = 30 + state.party.reduce((s, p) => s + p.lv * 8, 0);
+  mode = "modal"; state.danger = 0;
+  const innCost = 30 + state.party.reduce((s2, p) => s2 + p.lv * 8, 0);
   const shop = Object.entries(ITEMS).map(([id, it]) => `<button data-a="buyItem" data-v="${id}">${it.name}　${it.price}</button>`).join("");
-  const arms = Object.entries(EQUIPMENT).filter(([id, e]) => !e.cursed && id !== "muramasaShard").map(([id, e]) => `<button data-a="buyEquip" data-v="${id}">${e.name}　${e.price}</button>`).join("");
+  const arms = Object.entries(EQUIPMENT).filter(([id, e]) => !e.cursed && !e.tier && id !== "muramasaShard").map(([id, e]) => `<button data-a="buyEquip" data-v="${id}">${e.name}　${e.price}</button>`).join("");
   modal(`<h2>入口の町</h2>${note ? `<p class="gold" style="white-space:pre-line">${note}</p>` : ""}<p>所持金 ${state.gold}ゴールド</p>
-    <div class="acts"><button data-a="inn">宿屋で休む（${innCost}）</button><button data-a="temple">寺院で蘇生</button><button data-a="decurse">寺院で呪い解き</button></div>
+    <div class="acts"><button data-a="inn">宿屋で休む（${innCost}）</button><button data-a="temple">寺院で蘇生</button><button data-a="decurse">寺院で呪い解き</button>
+      <button data-a="arena">試練の間</button><button data-a="tavern">酒場</button></div>
     <p class="dim">道具屋</p><div class="grid">${shop}</div>
-    <p class="dim">武具屋（買った品は「装備を整える」で身につける）</p><div class="grid">${arms}</div>
-    <div class="acts"><button data-a="equipBest">装備を整える</button><button data-a="save">記録する</button><button data-a="close">迷宮へ戻る</button></div>`);
+    <p class="dim">武具屋（買った品は「装備」で身につける）</p><div class="grid">${arms}</div>
+    <div class="acts"><button data-a="equipMenu">装備</button><button data-a="equipBest">おまかせ装備</button><button data-a="save">記録する</button><button data-a="close">迷宮へ戻る</button></div>`);
+}
+const inTown = () => $("modalBox").innerHTML.includes("入口の町") || $("modalBox").dataset.from === "town";
+function back(note) { if ($("modalBox").dataset.from === "town") town(note); else { mode = "explore"; campMenu(note); } }
+function sub(html, from) { modal(html); $("modalBox").dataset.from = from; }
+function equipMenu(note = "") {
+  const from = inTown() ? "town" : "camp";
+  const slotName = { weapon: "武器", armor: "鎧", accessory: "装身具" };
+  const rows = state.party.map((p, i) => `<div style="margin:8px 0"><span class="gold">${p.name}</span>（${p.className}）攻撃${atkOf(p)} 防御${acOf(p)}<br>` +
+    ["weapon", "armor", "accessory"].map(sl => { const e = EQUIPMENT[p.equip[sl]]; return `<button data-a="eqPick" data-v="${i}|${sl}" ${p.dead ? "disabled" : ""}>${slotName[sl]}：<span style="color:${e?.tier ? TIER_COLORS[e.tier] : "inherit"}">${e ? e.name : "なし"}</span>${p.cursedSlot === sl ? "（呪）" : ""}</button>`; }).join(" ") + `</div>`).join("");
+  sub(`<h2>装備</h2>${note ? `<p class="gold">${note}</p>` : ""}${rows}<div class="acts"><button data-a="back">戻る</button></div>`, from);
+}
+function eqPick(i, sl) {
+  const from = $("modalBox").dataset.from, p = state.party[i];
+  if (p.cursedSlot === sl) return equipMenu(`${p.name}の${sl === "weapon" ? "武器" : sl === "armor" ? "鎧" : "装身具"}は呪われていて外せない。寺院へ。`);
+  const opts = Object.entries(state.stock).filter(([id, n]) => n > 0 && EQUIPMENT[id]?.type === sl);
+  const line = (id, e) => { const s2 = e.sp ? Object.entries(e.sp).map(([k, v]) => ({ crit: "会心", drain: "吸命", multi: "追撃", spell: "呪力", evade: "回避", thorns: "棘", regen: "再生", ward: "守護", luck: "宝運", first: "先手", boss: "強敵" }[k] + (typeof v === "number" && v < 1 ? `+${Math.round(v * 100)}%` : typeof v === "number" ? `+${v}` : ""))).join(" ") : "";
+    return `<button data-a="eqSet" data-v="${i}|${sl}|${id}" style="text-align:left"><span style="color:${e.tier ? TIER_COLORS[e.tier] : "inherit"}">${e.name}</span>　攻撃${e.atk >= 0 ? "+" : ""}${e.atk} 防御${e.ac}　<span class="dim">${s2}</span>（×${state.stock[id]}）</button>`; };
+  sub(`<h2>${p.name}の${sl === "weapon" ? "武器" : sl === "armor" ? "鎧" : "装身具"}</h2>
+    <div class="grid" style="grid-template-columns:1fr">${opts.map(([id]) => line(id, EQUIPMENT[id])).join("") || '<span class="dim">持ち替えられる品がない</span>'}
+    <button data-a="eqSet" data-v="${i}|${sl}|">外す</button></div><div class="acts"><button data-a="equipMenu">戻る</button></div>`, from);
+}
+function eqSet(i, sl, id) {
+  const p = state.party[i], cur = p.equip[sl];
+  if (cur) state.stock[cur] = (state.stock[cur] || 0) + 1;
+  p.equip[sl] = id || null;
+  if (id) state.stock[id]--;
+  renderHud(); equipMenu(`${p.name}は${id ? EQUIPMENT[id].name + "を身につけた" : "装備を外した"}。`);
+}
+function bookView() {
+  const from = inTown() ? "town" : "camp";
+  const ids = Object.keys(MONSTERS);
+  const cells = ids.map(id => { const b = state.book[id]; const m = MONSTERS[id];
+    return b?.killed ? `<div><span class="gold">${m.name}</span> <span class="dim">討伐${b.killed}</span></div>` : b?.seen ? `<div>${m.name} <span class="dim">遭遇のみ</span></div>` : `<div class="dim">？？？</div>`; }).join("");
+  sub(`<h2>怪物図鑑　${bookCount()}/${bookTotal()}（${bookPct()}%）</h2><p class="dim">倒した怪物が記録される。25%・50%・75%・100%で褒美がある。</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));font-size:14px">${cells}</div><div class="acts"><button data-a="back">戻る</button></div>`, from);
+}
+function rareView() {
+  const from = inTown() ? "town" : "camp";
+  const rows = Object.entries(RARES).sort((a, b) => a[1].tier - b[1].tier).map(([id, e]) => state.rares[id]
+    ? `<div style="margin:6px 0"><span style="color:${TIER_COLORS[e.tier]}">【${TIER_NAMES[e.tier]}】${e.name}</span>　<span class="dim">${e.desc}</span></div>`
+    : `<div class="dim" style="margin:6px 0">【${TIER_NAMES[e.tier]}】？？？</div>`).join("");
+  const sig = Object.entries(SIGILS).map(([k, sg]) => state.sigils[k] ? `<span style="color:#c890ff">${sg.name}</span>` : `<span class="dim">？？？の秘印</span>`).join("　");
+  sub(`<h2>秘宝目録　${Object.keys(state.rares).length}/${Object.keys(RARES).length}</h2><p>秘印：${sig}</p>${rows}<div class="acts"><button data-a="back">戻る</button></div>`, from);
+}
+function achView() {
+  const from = inTown() ? "town" : "camp";
+  const rows = ACHIEVEMENTS.map(a => state.ach[a.id] ? `<div style="margin:5px 0"><span class="gold">${a.name}</span>　<span class="dim">${a.desc}</span></div>` : `<div class="dim" style="margin:5px 0">？？？　${a.desc}</div>`).join("");
+  sub(`<h2>称号　${Object.keys(state.ach).length}/${ACHIEVEMENTS.length}</h2><p>やりこみ度 <span class="gold">${completion()}%</span>（図鑑・秘宝目録・称号の平均）</p>${rows}<div class="acts"><button data-a="back">戻る</button></div>`, from);
+}
+function arenaView(note = "") {
+  const maxF = state.stats.maxFloor + 1;
+  const rows = ARENA.map((t, i) => `<button data-a="arenaGo" data-v="${i}" ${maxF < t.need ? "disabled" : ""}>${t.name}　<span class="dim">${maxF < t.need ? `地下${t.need}階に到達で解放` : `報酬：金貨2倍・レア装備${Math.round(t.rare * 100)}%${t.minTier ? "（秘宝以上）" : ""}`}${state.stats.arenaBest > i ? "　✓" : ""}</span></button>`).join("");
+  sub(`<h2>試練の間</h2>${note ? `<p class="gold">${note}</p>` : ""}<p class="dim">深い階の怪物を、さらに強くして呼び出す。負けても命までは取られない。</p><div class="grid" style="grid-template-columns:1fr">${rows}</div><div class="acts"><button data-a="back">戻る</button></div>`, "town");
+}
+const HIRE_COST = 200;
+const HIRE_NAMES = ["アルド", "ヴェラ", "ドゥーン", "イルゼ", "カシム", "ネリス", "ゴラン", "セラ", "トルヴィ", "マグナ", "リュード", "オスカ", "ハイネ", "ザイラ", "ボルグ", "エリン"];
+function tavernView(note = "") {
+  const res = state.reserve.map((p, ri) => `<div style="margin:6px 0"><span class="gold">${p.name}</span>（${p.className}・レベル${p.lv}${p.dead ? "・" + (p.dead === "ashes" ? "灰" : p.dead === "lost" ? "消失" : "死亡") : ""}）　` +
+    state.party.map((q, i) => i === 0 && !q.dead ? "" : `<button data-a="tavSwap" data-v="${ri}|${i}">${q.name}と交代</button>`).join(" ") + `</div>`).join("");
+  const hire = Object.entries(CLASSES).map(([id, c]) => `<button data-a="hire" data-v="${id}">${c.label}</button>`).join("");
+  sub(`<h2>酒場</h2>${note ? `<p class="gold" style="white-space:pre-line">${note}</p>` : ""}<p class="dim">隊列を離れた仲間がここで待っている。</p>${res || '<p class="dim">待っている者はいない。</p>'}
+    <p class="dim">新しい冒険者を雇う（${HIRE_COST}ゴールド・レベル1）。消失した仲間がいれば、その場所に入る。</p><div class="acts">${hire}</div>
+    <div class="acts"><button data-a="back">戻る</button></div>`, "town");
+}
+function hire(cls) {
+  if (state.gold < HIRE_COST) return tavernView("金が足りない。");
+  state.gold -= HIRE_COST;
+  const used = new Set([...state.party, ...state.reserve].map(p => p.name));
+  const name = HIRE_NAMES.find(n => !used.has(n)) || `${CLASSES[cls].label}${rand(2, 99)}`;
+  const m = makeMember({ id: `hire_${Date.now()}`, name, cls, align: choose(["善", "中", "悪"]) });
+  const slot = state.party.findIndex(p => p.dead === "lost");
+  if (slot >= 0) { const gone = state.party[slot]; state.party[slot] = m; renderHud(); return tavernView(`${name}（${m.className}）が雇われ、${gone.name}のいた場所に入った。`); }
+  state.reserve.push(m); renderHud();
+  tavernView(`${name}（${m.className}）が雇われ、酒場で出番を待っている。`);
+}
+function nextCycle() {
+  state.cycle++;
+  const s0 = FLOORS[0].start;
+  const keep = { intro0: true };
+  state.flags = keep; state.floor = 0; state.x = s0[0]; state.y = s0[1]; state.dir = s0[2]; state.danger = 0; state.seen = {};
+  state.party.forEach(p => { if (p.dead === "dead") { p.dead = undefined; p.hp = 1; } if (!p.dead) { p.hp = p.maxHp; p.mp = [...p.maxMp]; p.status = {}; } });
+  closeModal(); enterGame(`${state.cycle + 1}周目。城は再び闇に沈み、怪物たちはより強く、宝はより深く眠っている。\n${PROLOGUE}`);
+  saveGame();
 }
 function action(a, v) {
   if (a.startsWith("c") && chest && ["cInspect", "cDisarm", "cOpen", "cLeave"].includes(a)) return chestAction(a);
@@ -1164,13 +1490,42 @@ function action(a, v) {
       for (const l of log) if (typeof l === "function") l(); else say(l);
       renderHud(); mode = "explore"; campMenu(log.filter(l => typeof l === "string").join(" ")); break;
     }
-    case "equipBest": equipBest(); campOrTown("可能な限り良い装備に持ち替えた。"); break;
+    case "equipBest": equipBest(); renderHud(); campOrTown("可能な限り良い装備に持ち替えた。"); break;
+    case "equipMenu": if (!$("modalBox").dataset.from) $("modalBox").dataset.from = inTown() ? "town" : "camp"; equipMenu(); break;
+    case "eqPick": { const [i, sl] = v.split("|"); eqPick(+i, sl); break; }
+    case "eqSet": { const [i, sl, id] = v.split("|"); eqSet(+i, sl, id); break; }
+    case "book": bookView(); break;
+    case "rareList": rareView(); break;
+    case "achList": achView(); break;
+    case "back": back(); break;
+    case "arena": arenaView(); break;
+    case "arenaGo": {
+      const t = ARENA[+v]; closeModal(); mode = "explore";
+      startBattle(choose(FLOORS[t.floor].monsters), { arena: +v }); break;
+    }
+    case "tavern": tavernView(); break;
+    case "hire": hire(v); break;
+    case "tavSwap": {
+      const [ri, pi] = v.split("|").map(Number);
+      const out = state.party[pi], inn = state.reserve[ri];
+      state.party[pi] = inn; state.reserve[ri] = out; renderHud();
+      tavernView(`${inn.name}が隊列に加わり、${out.name}が酒場に残った。`); break;
+    }
+    case "allySwap": case "allyNo": {
+      const ev = state._allyEv; delete state._allyEv; closeModal(); mode = "explore";
+      if (a === "allyNo" || !ev) { say("ラルハスは黙って闇の奥を見つめている。また来ればいい。"); break; }
+      const ally = JSON.parse(JSON.stringify(NAMED_ALLIES[ev.id])); delete ally.greeting;
+      const out = state.party[+v]; state.party[+v] = ally; state.reserve.push(out); state.flags[ev.done] = true;
+      say(`${ally.name}が隊列に加わった。${out.name}は入口の酒場で待つことになった。`); audio.levelup(); renderHud(); break;
+    }
+    case "nextCycle": nextCycle(); break;
+    case "stay": closeModal(); mode = "explore"; say("城の闇は、まだ深い。"); renderHud(); break;
     case "swapRow": { const p = state.party.splice(0, 1)[0]; state.party.splice(3, 0, p); renderHud(); campOrTown(`${p.name}が後列へ下がった。`); break; }
     case "town": town(); break;
     case "inn": {
       const cost = 30 + state.party.reduce((s, p) => s + p.lv * 8, 0);
       if (state.gold < cost) { town(`宿代は${cost}ゴールド。足りない。`); break; }
-      state.gold -= cost; state.party.forEach(p => { if (p.hp > 0 && !p.dead) { p.hp = p.maxHp; p.mp = [...p.maxMp]; delete p.status.sleep; } });
+      state.gold -= cost; state.danger = 0; state.party.forEach(p => { if (p.hp > 0 && !p.dead) { p.hp = p.maxHp; p.mp = [...p.maxMp]; p.status = {}; } });
       audio.heal(); renderHud(); town(`馬小屋で休んだ。${cost}ゴールド支払った。`); break;
     }
     case "temple": town(temple()); renderHud(); break;
@@ -1184,20 +1539,26 @@ function action(a, v) {
     }
   }
 }
-function campOrTown(note) { if ($("modalBox").innerHTML.includes("入口の町")) town(note); else { mode = "explore"; campMenu(note); } }
+function campOrTown(note) { if (inTown()) town(note); else { mode = "explore"; campMenu(note); } }
 function equipBest() {
-  for (const p of state.party) for (const [id, count] of Object.entries(state.stock)) {
-    if (count <= 0) continue; const e = EQUIPMENT[id]; if (!e) continue;
-    const slot = e.type; if (p.cursedSlot === slot) continue;
-    const cur = p.equip[slot];
-    const better = slot === "weapon" ? e.atk > (EQUIPMENT[cur]?.atk || 0) : e.ac < (EQUIPMENT[cur]?.ac || 0);
-    if (better) { if (cur) state.stock[cur] = (state.stock[cur] || 0) + 1; p.equip[slot] = id; state.stock[id]--; }
+  for (const p of state.party) {
+    if (p.dead) continue;
+    for (const slot of ["weapon", "armor", "accessory"]) {
+      if (p.cursedSlot === slot) continue;
+      let best = p.equip[slot], bestScore = equipScore(EQUIPMENT[best], p);
+      for (const [id, n] of Object.entries(state.stock)) {
+        if (n <= 0 || EQUIPMENT[id]?.type !== slot || EQUIPMENT[id].cursed) continue;
+        const sc = equipScore(EQUIPMENT[id], p); if (sc > bestScore) { best = id; bestScore = sc; }
+      }
+      if (best !== p.equip[slot]) { const cur = p.equip[slot]; if (cur) state.stock[cur] = (state.stock[cur] || 0) + 1; p.equip[slot] = best; state.stock[best]--; }
+    }
   }
 }
 function temple() {
   const cands = state.party.filter(p => p.dead && p.dead !== "lost");
   if (!cands.length) { const lost = state.party.filter(p => p.dead === "lost"); return lost.length ? `${lost.map(p => p.name).join("、")}は永遠に失われた。いかなる奇跡も届かぬ。` : "蘇生を待つ者はいない。"; }
-  const t = cands[0], ashes = t.dead === "ashes", cost = ashes ? 500 + t.lv * 150 : 250 + t.lv * 80;
+  // 序盤で詰まないよう、通常版より蘇生を安くしている
+  const t = cands[0], ashes = t.dead === "ashes", cost = ashes ? 350 + t.lv * 140 : 120 + t.lv * 70;
   if (state.gold < cost) return `${t.name}（${ashes ? "灰" : "死亡"}）の蘇生には${cost}ゴールド必要だ。`;
   state.gold -= cost;
   if (Math.random() < (ashes ? Math.max(0.3, 0.6 - t.lv * 0.025) : Math.max(0.55, 0.85 - t.lv * 0.015))) {
@@ -1222,7 +1583,7 @@ function saveGame() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)
 function loadGame() {
   let s = null; try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch {}
   if (!s || !s.party) return false;
-  state = s; enterGame("冒険の記録を読み込んだ。"); return true;
+  state = fillState(s); enterGame("冒険の記録を読み込んだ。"); return true;
 }
 function startNew() { state = newState(); enterGame(PROLOGUE); }
 function enterGame(text) {
@@ -1234,9 +1595,15 @@ function enterGame(text) {
 }
 function showTitle() {
   mode = "title"; endBattle(); mode = "title";
+  titleInfo();
   $("title").classList.remove("hidden");
 }
 $("title").style.backgroundImage = "url(img/title.png)";
+function titleInfo() {
+  let sv = null; try { sv = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch {}
+  const el = document.querySelector("#title .note");
+  if (sv && sv.party) { const keep = state; state = fillState(sv); el.innerHTML = `記録：${F().name}　${state.cycle + 1}周目　やりこみ度 ${completion()}%　　<a href="./" style="color:var(--gold)">通常版へ</a>`; state = keep; }
+}
 $("btnNew").addEventListener("click", () => { audio.init(); startNew(); });
 $("btnLoad").addEventListener("click", () => { audio.init(); if (!loadGame()) { $("btnLoad").textContent = "記録がない"; setTimeout(() => $("btnLoad").textContent = "続きから", 1500); } });
 
@@ -1254,7 +1621,7 @@ function act(c) {
     if (/^n[1-4]$/.test(c) && el === $("cmd")) { const b = el.querySelectorAll("button")[+c[1]]; if (b && !b.disabled) b.click(); }
     return;
   }
-  if (mode === "modal" || mode === "dead" || mode === "ending") { if (c === "cancel" && mode === "modal" && !chest) action("close"); return; }
+  if (mode === "modal" || mode === "dead" || mode === "ending") { if (c === "cancel" && mode === "modal" && !chest) action(state._allyEv ? "allyNo" : "close"); return; }
   if (mode !== "explore" || busy || spinT > 0) return;
   if (anim.t < 1) { if ((performance.now() - anim.start) / 1000 < anim.dur) return; finishAnim(); }
   if (c === "left" || c === "right" || c === "turn") { audio.turn(); turnTo((state.dir + (c === "left" ? 3 : c === "right" ? 1 : 2)) % 4, c === "turn" ? 0.34 : 0.2); renderHud(); return; }
@@ -1346,7 +1713,9 @@ function tick() {
         if (m.dying <= 0) m.mesh.visible = false;
       } else if (m.e.hp > 0) {
         m.mesh.material.opacity = m.appear;
-        const slept = m.e.sleep > 0, t = m.tone; m.mesh.material.color.setRGB(t * (slept ? 0.7 : 1), t * (slept ? 0.8 : 1), t);
+        const slept = m.e.sleep > 0, t = m.tone;
+        if (battle.id === "golden_ghost") m.mesh.material.color.setRGB(1.3, 1.0, 0.35);
+        else m.mesh.material.color.setRGB(t * (slept ? 0.7 : 1), t * (slept ? 0.8 : 1), t);
       }
     }
     updateFoeLabels();
@@ -1375,7 +1744,7 @@ function tick() {
   grade.uniforms.uHurt.value = hurtT; hurtT = Math.max(0, hurtT - dt * 1.5);
   perf.frames++;
   if (!perf.lowered && time > 5 && time - perf.t0 > 3) { if (perf.frames / (time - perf.t0) < 28) lowerQuality(); perf.frames = 0; perf.t0 = time; }
-  composer.render(dt);
+  if (!TEST) composer.render(dt);
   requestAnimationFrame(tick);
 }
 addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
@@ -1383,9 +1752,13 @@ addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; cam
 // 表題の背後に迷宮を映しておく
 state = newState();
 buildFloor(0); placeCamera();
+titleInfo();
 setTimeout(() => { $("fade").style.opacity = 0; }, 200);
 tick();
 
 // 自動確認用
-window.__g = { get state() { return state; }, get mode() { return mode; }, get battle() { return battle; }, startBattle, act, changeFloor, startNew,
+window.__g = { get state() { return state; }, set state(v) { state = v; }, get mode() { return mode; }, set mode(v) { mode = v; }, get battle() { return battle; }, get busy() { return busy; },
+  get chest() { return chest; }, get dark() { return dark; }, get noSpell() { return noSpell; }, FLOORS, MONSTERS, ITEMS, EQUIPMENT,
+  startBattle, act, changeFloor, startNew, playerRound, gainRare, completion, checkAch, sp, equipBest, bookPct, RARES, SIGILS, ACHIEVEMENTS, chestAction, action, campMenu, town, loadGame, saveGame, liveEnemies, living, handleEvent,
+  msg: () => $("msg").textContent, modalText: () => $("modal").classList.contains("hidden") ? "" : $("modalBox").innerText,
   tp(x, y, d) { state.x = x; state.y = y; state.dir = d; placeCamera(); reveal(); renderHud(); } };
