@@ -1483,7 +1483,7 @@ function showTitle() {
       <button data-action="new">新しく始める</button>
       <button data-action="load">続きから</button>
       <button data-action="help">説明</button>
-      <a href="3d.html" style="color:#d9b65f;align-self:center;margin-left:8px">立体試作版を見る</a>
+      <a href="3d.html" style="color:#d9b65f;align-self:center;margin-left:8px">立体版で遊ぶ</a>
     </div>
   `, true);
 }

@@ -3,48 +3,105 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>サカムビット公の逆襲 立体試作版</title>
+<title>サカムビット公の逆襲 立体版</title>
 <style>
+  :root {
+    --ink: #f1e7cc; --dim: #a99f86; --gold: #d9b65f; --red: #e0503a; --green: #58d98a; --blue: #7fb8ff;
+    --panel: rgba(8, 6, 4, .78); --line: rgba(217, 182, 95, .5);
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #f4ecd0;
-    font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif; user-select: none; touch-action: none; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--ink);
+    font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif JP", serif; user-select: none; touch-action: none; }
   #view { position: fixed; inset: 0; }
   canvas { display: block; }
-  .panel { background: rgba(6,4,2,.72); border: 1px solid rgba(217,182,95,.55); box-shadow: 0 0 24px rgba(0,0,0,.6) inset; }
-  #hudTop { position: fixed; top: 14px; left: 14px; padding: 10px 16px; }
-  #floorName { font-size: 22px; color: #d9b65f; letter-spacing: .08em; }
-  #pos { font-size: 14px; color: #c9bfa4; margin-top: 2px; }
-  #mapPanel { position: fixed; top: 14px; right: 14px; padding: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 0 0 1px rgba(0,0,0,.6) inset, 0 6px 24px rgba(0,0,0,.5); }
+  button { font: inherit; color: var(--ink); background: rgba(20,14,8,.85); border: 1px solid var(--line); padding: 8px 12px; cursor: pointer; }
+  button:hover, button.sel { color: #fff6d8; border-color: var(--gold); background: rgba(70,48,18,.9); box-shadow: 0 0 12px rgba(217,182,95,.35); }
+  button:disabled { opacity: .4; cursor: default; }
+  .hidden { display: none !important; }
+
+  /* 上部の表示 */
+  #hudTop { position: fixed; top: 12px; left: 12px; padding: 8px 14px; min-width: 220px; }
+  #floorName { font-size: 20px; color: var(--gold); letter-spacing: .08em; }
+  #status { font-size: 13px; color: var(--dim); margin-top: 2px; line-height: 1.5; }
+  #mapPanel { position: fixed; top: 12px; right: 12px; padding: 6px; cursor: pointer; }
   #map { display: block; width: 190px; height: 190px; image-rendering: pixelated; }
-  #msg { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(820px, calc(100% - 28px));
-    padding: 14px 20px; font-size: 19px; line-height: 1.7; min-height: 3.4em; transition: opacity .4s; }
-  #help { position: fixed; left: 14px; bottom: 22px; font-size: 13px; color: #a89f86; line-height: 1.6; }
-  #back { position: fixed; top: 92px; left: 14px; font-size: 14px; color: #d9b65f; padding: 6px 12px; text-decoration: none; }
-  #fade { position: fixed; inset: 0; background: #000; pointer-events: none; opacity: 1; transition: opacity .9s; }
-  #party { position: fixed; top: 132px; left: 14px; padding: 8px 14px; width: 244px; font-size: 14px; }
-  .bar { height: 9px; background: #1a0d08; border: 1px solid rgba(217,182,95,.4); margin-top: 4px; }
-  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #8a1a10, #e0503a); transition: width .25s; }
-  #pbar > i { background: linear-gradient(90deg, #1f6b3a, #58ff9a); }
-  #battle { position: fixed; top: 16%; left: 50%; transform: translateX(-50%); padding: 10px 22px; text-align: center; display: none; min-width: 300px; }
-  #battle .name { font-size: 24px; color: #ffb0a0; letter-spacing: .1em; }
-  #battle .hint { font-size: 13px; color: #c9bfa4; margin-top: 6px; }
-  #dmg { position: fixed; left: 50%; top: 42%; transform: translate(-50%, 0); font-size: 46px; font-weight: bold; color: #fff2c0;
-    text-shadow: 0 0 12px #ff8a30, 0 2px 0 #000; pointer-events: none; opacity: 0; }
-  #touch { position: fixed; right: 14px; bottom: 120px; display: none; gap: 6px; grid-template-columns: repeat(3, 56px); }
-  #touch button { height: 56px; font-size: 22px; color: #f4ecd0; background: rgba(0,0,0,.6); border: 1px solid rgba(244,236,208,.5); border-radius: 8px; }
-  @media (max-width: 820px), (pointer: coarse) {
+  #mapBig { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.82); z-index: 30; }
+  #mapBig canvas { width: min(80vmin, 640px); height: min(80vmin, 640px); image-rendering: pixelated; border: 1px solid var(--line); }
+
+  /* 隊列 */
+  #party { position: fixed; left: 12px; right: 12px; bottom: 10px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .pm { padding: 6px 8px 7px; font-size: 13px; line-height: 1.35; position: relative; transition: transform .15s; }
+  .pm.hurt { animation: hurt .45s; }
+  @keyframes hurt { 0% { transform: translateY(0); background: rgba(140,20,10,.9); } 30% { transform: translateY(-4px); } 100% { transform: none; } }
+  .pm .nm { color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pm .cl { color: var(--dim); font-size: 11px; }
+  .pm .st { color: var(--red); font-size: 11px; min-height: 1.3em; }
+  .pm.dead { opacity: .45; filter: grayscale(1); }
+  .bar { height: 6px; background: #1a0d08; border: 1px solid rgba(217,182,95,.3); margin-top: 3px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #1f6b3a, #58ff9a); transition: width .3s; }
+  .bar.low > i { background: linear-gradient(90deg, #8a1a10, #ff6040); }
+  .row-tag { position: absolute; top: 4px; right: 6px; font-size: 10px; color: var(--dim); }
+
+  /* 文章 */
+  #msg { position: fixed; left: 50%; transform: translateX(-50%); bottom: 104px; width: min(860px, calc(100% - 24px));
+    padding: 12px 20px; font-size: 18px; line-height: 1.75; min-height: 3.5em; max-height: 9.5em; overflow-y: auto; white-space: pre-line; }
+
+  /* 戦闘 */
+  #cmd { position: fixed; right: 12px; bottom: 104px; display: grid; gap: 5px; width: 190px; padding: 8px; z-index: 5; }
+  #cmd button { text-align: left; }
+  #cmd .key { color: var(--dim); font-size: 11px; float: right; margin-top: 3px; }
+  #sub { position: fixed; right: 210px; bottom: 104px; display: grid; gap: 5px; width: 230px; padding: 8px; z-index: 5; }
+  #foes { position: fixed; inset: 0; pointer-events: none; }
+  .foe { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 13px; text-shadow: 0 1px 2px #000; min-width: 110px; }
+  .foe .bar { width: 110px; margin: 2px auto 0; } .foe .bar > i { background: linear-gradient(90deg, #8a1a10, #ff6040); }
+  .foe.tgt .fn::before { content: "▶ "; color: var(--gold); }
+  .pop { position: fixed; transform: translate(-50%, 0); font-size: 34px; font-weight: bold; color: #fff2c0; pointer-events: none;
+    text-shadow: 0 0 10px #ff8a30, 0 2px 0 #000; z-index: 20; }
+  body.inbattle #msg { top: 124px; bottom: auto; max-height: 7.2em; font-size: 16px; width: min(760px, calc(100% - 440px)); }
+  #battleTitle { position: fixed; top: 74px; left: 50%; transform: translateX(-50%); padding: 6px 20px; font-size: 20px; letter-spacing: .12em; color: #ffc8b0; z-index: 4; }
+
+  /* 窓（町・宝箱・野営・表題・結末） */
+  #modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); z-index: 40; }
+  #modalBox { width: min(720px, calc(100% - 24px)); max-height: 86vh; overflow-y: auto; padding: 20px 24px; }
+  #modalBox h1 { margin: 0 0 8px; color: var(--gold); font-weight: normal; letter-spacing: .12em; font-size: 30px; }
+  #modalBox h2 { margin: 0 0 10px; color: var(--gold); font-weight: normal; letter-spacing: .1em; }
+  #modalBox p { line-height: 1.8; margin: 8px 0; }
+  #modalBox .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  #modalBox .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+  #modalBox img { width: 100%; max-height: 300px; object-fit: cover; border: 1px solid var(--line); }
+  .dim { color: var(--dim); } .gold { color: var(--gold); } .red { color: var(--red); }
+
+  #title { position: fixed; inset: 0; z-index: 50; display: grid; place-items: end center; background: #000 center/contain no-repeat; }
+  #title .shade { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, rgba(0,0,0,.2), rgba(0,0,0,.85)); }
+  #title .box { position: relative; text-align: center; padding: 18px 28px; margin-bottom: 7vh; background: rgba(0,0,0,.55); border: 1px solid var(--line); }
+  #title h1 { font-size: clamp(22px, 4.2vw, 40px); margin: 0; color: var(--gold); letter-spacing: .14em; font-weight: normal; text-shadow: 0 0 24px rgba(255,160,60,.45), 0 3px 0 #000; }
+  #title .sub { margin: 8px 0 22px; color: var(--ink); letter-spacing: .3em; }
+  #title .acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  #title .acts button { min-width: 150px; font-size: 18px; padding: 10px 18px; }
+  #title .note { margin-top: 16px; font-size: 13px; color: var(--dim); }
+
+  #fade { position: fixed; inset: 0; background: #000; pointer-events: none; opacity: 1; transition: opacity .8s; z-index: 45; }
+  #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 3; }
+
+  #help { position: fixed; left: 12px; top: 92px; font-size: 12px; color: var(--dim); line-height: 1.6; padding: 6px 10px; }
+  #touch { position: fixed; right: 12px; bottom: 104px; display: none; gap: 6px; grid-template-columns: repeat(3, 54px); z-index: 4; }
+  #touch button { height: 54px; padding: 0; font-size: 20px; border-radius: 8px; }
+
+  @media (max-width: 900px), (pointer: coarse) {
     #help { display: none; }
     #touch { display: grid; }
+    #party { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; left: 6px; right: 6px; bottom: 6px; }
+    .pm { font-size: 11px; padding: 4px 6px; }
+    .pm .st { display: none; }
+    #msg { bottom: 168px; font-size: 14px; padding: 8px 12px; max-height: 7em; }
+    #touch { bottom: 300px; }
+    body.inbattle #msg { top: 110px; width: calc(100% - 24px); font-size: 13px; max-height: 6em; }
+    #cmd { bottom: 168px; width: 150px; right: 6px; }
+    #sub { right: 160px; bottom: 168px; width: 180px; }
     #map { width: 96px; height: 96px; }
-    #mapPanel { top: 10px; right: 10px; padding: 5px; }
-    #hudTop { top: 10px; left: 10px; padding: 7px 10px; max-width: calc(100% - 136px); }
-    #floorName { font-size: 16px; }
-    #pos { font-size: 12px; }
-    #back { top: 74px; left: 10px; font-size: 12px; padding: 4px 8px; }
-    #party { top: 106px; left: 10px; width: 180px; font-size: 12px; padding: 6px 10px; }
-    #battle { top: 22%; min-width: 0; width: calc(100% - 28px); }
-    #touch button { font-size: 18px; white-space: nowrap; }
-    #msg { bottom: 300px; font-size: 15px; }
+    #hudTop { padding: 6px 10px; min-width: 0; max-width: calc(100% - 130px); }
+    #floorName { font-size: 15px; } #status { font-size: 11px; }
   }
 </style>
 <script type="importmap">
@@ -56,663 +113,35 @@
 </head>
 <body>
 <div id="view"></div>
-<div id="hudTop" class="panel"><div id="floorName"></div><div id="pos"></div></div>
-<a id="back" class="panel" href="./">← 通常版へ戻る</a>
-<div id="mapPanel" class="panel"><canvas id="map" width="190" height="190"></canvas></div>
+<div id="flash"></div>
+<div id="foes"></div>
+<div id="hudTop" class="panel"><div id="floorName"></div><div id="status"></div></div>
+<div id="help" class="panel">W 前進 ／ A・D 向きを変える ／ X 振り返る<br>Z・Enter 調べる・決定 ／ C 野営 ／ M 地図</div>
+<div id="mapPanel" class="panel" title="地図を広げる（M）"><canvas id="map" width="190" height="190"></canvas></div>
+<div id="battleTitle" class="panel hidden"></div>
 <div id="msg" class="panel"></div>
-<div id="party" class="panel">隊列の体力 <span id="php"></span><div class="bar" id="pbar"><i></i></div></div>
-<div id="battle" class="panel"><div class="name" id="bname"></div><div class="bar" id="bbar"><i></i></div><div class="hint">Z・Enter：攻撃　Esc：退く</div></div>
-<div id="dmg"></div>
-<div id="help">W：前進　A：左を向く　D：右を向く　X：振り返る　矢印キーも可</div>
+<div id="cmd" class="panel hidden"></div>
+<div id="sub" class="panel hidden"></div>
+<div id="party"></div>
 <div id="touch">
-  <span></span><button data-c="forward">▲</button><span></span>
+  <button data-c="camp">野</button><button data-c="forward">▲</button><button data-c="ok">調</button>
   <button data-c="left">◀</button><button data-c="turn">↻</button><button data-c="right">▶</button>
-  <button data-c="attack" style="grid-column: span 2">攻撃</button><button data-c="flee">退く</button>
+</div>
+<div id="mapBig" class="hidden"><canvas id="mapBigC" width="608" height="608"></canvas></div>
+<div id="modal" class="hidden"><div id="modalBox" class="panel"></div></div>
+<div id="title">
+  <div class="shade"></div>
+  <div class="box">
+    <h1>サカムビット公の逆襲</h1>
+    <div class="sub">― 奈落の城デスフォール ―</div>
+    <div class="acts">
+      <button id="btnNew">新しく始める</button>
+      <button id="btnLoad">続きから</button>
+    </div>
+    <div class="note">音が出ます。　<a href="./" style="color:var(--gold)">通常版へ</a></div>
+  </div>
 </div>
 <div id="fade"></div>
-
-<script type="module">
-import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-
-// ===== 迷宮データ（通常版と同じ五つの階） =====
-const FLOORS = [{"name":"地下1階 廃兵の回廊","color":"#58ff9a","start":[1,17,0],"map":["###################","#..T....#.....E..>#","#.#####.#.#####.#.#","#.....#.#.#...#.#.#","#####.#.#.#.#.#.#.#","#...#.#...#.#...#.#","#.#.#.#####.#####.#","#.#...#...#.....#.#","#.#####.#.#####.#.#","#.....#.#.....#.#.#","###.#.#.#####.#.#.#","#...#.#.....#...#.#","#.###.#####.#####.#","#.#.....#...#.....#","#.#.###.#.###.###.#","#...#...#.....#.K.#","#.###.###########.#","#S................#","###################"],"stairs":[{"x":17,"y":1,"to":1}]},{"name":"地下2階 魔導工房跡","color":"#60c8ff","start":[1,1,1],"map":["###################","#<....#......T....#","#####.#.#########.#","#.....#.....#.....#","#.#########.#.###.#","#.#...E...#.#.#...#","#.#.#####.#.#.#.###","#.#.#...#...#.#...#","#.#.#.#.#####.###.#","#...#.#.....#.....#","#####.#####.#####.#","#...#.....#.....#.#","#.#.#####.#####.#.#","#.#.....#.....#.#.#","#.#####.#####.#.#.#","#.....#.....#.#...#","#.###.#####.#.###>#","#...........#.....#","###################"],"stairs":[{"x":1,"y":1,"to":0},{"x":17,"y":16,"to":2}]},{"name":"地下3階 地下牢獄","color":"#bf8cff","start":[1,1,1],"map":["###################","#<......#.........#","#.#####.#.#######.#","#.#...#.#...#.....#","#.#.#.#.###.#.#####","#...#.#.....#.....#","#####.###########.#","#.....#.....T...#.#","#.#####.#######.#.#","#.#.....#.....#.#.#","#.#.#####.###.#.#.#","#.#.#.....#...#...#","#.#.#.#####.#####.#","#...#.....#.....#.#","#.#######.#####.#.#","#.......#.....#.#.#","#######.#####.#.#>#","#.............#...#","###################"],"stairs":[{"x":1,"y":1,"to":1},{"x":17,"y":16,"to":3}]},{"name":"地下4階 宝物庫回廊","color":"#ffcf66","start":[1,1,1],"map":["###################","#<....T#..........#","#.#####.#########.#","#.#.....#.......#.#","#.#.#####.#####.#.#","#.#.....#.#...#.#.#","#.#####.#.#.#.#.#.#","#.....#.#...#.#...#","#####.#.#####.#####","#.....#.....#.....#","#.#########.#####.#","#.#.......#.....#.#","#.#.#####.#####.#.#","#.#.#...#.....#...#","#.#.#.#.#####.###.#","#...#.#.....#...K.#","#.###.#####.#####>#","#.................#","###################"],"stairs":[{"x":1,"y":1,"to":2},{"x":17,"y":16,"to":4}]},{"name":"地下5階 玉座の間","color":"#ff6666","start":[1,1,1],"map":["###################","#<................#","#.###############.#","#.................#","#.###############.#","#.................#","#.###############.#","#.................#","#.###############.#","#........B........#","#.###############.#","#.................#","#.###############.#","#.................#","#.###############.#","#.................#","#.###############.#","#.................#","###################"],"stairs":[{"x":1,"y":1,"to":3}]}];
-const INTRO = [
-  "第一章　廃兵の回廊。この城を守って倒れた兵たちは、死してなお剣を手放せずにいる。",
-  "第二章　魔導工房跡。かつてここで賢者たちは禁断の術を研いだ。",
-  "第三章　地下牢獄。鎖に繋がれた罪人たちの呻きが、闇の底から這い上がってくる。",
-  "第四章　宝物庫回廊。黄金は墓標のように積み上げられている。",
-  "終章　玉座の間。腐敗した勇者アレックスが、公の帰還を待っていた。"
-];
-const DIRS = [{ dx: 0, dy: -1, n: "北" }, { dx: 1, dy: 0, n: "東" }, { dx: 0, dy: 1, n: "南" }, { dx: -1, dy: 0, n: "西" }];
-const MONSTER_FILES = ["001_rat", "002_wolf", "005_jackal", "006_gorilla", "007_bear", "008_hyena", "009_rat_elite", "010_wolf_elite", "014_gorilla_elite", "003_boar"];
-const MONSTER_NAMES = { "001_rat": "大ネズミ", "002_wolf": "黒檻の猟犬", "005_jackal": "コボルド", "006_gorilla": "石のトロル", "007_bear": "洞窟熊",
-  "008_hyena": "影の猟犬", "009_rat_elite": "疫病鼠", "010_wolf_elite": "狼の霊魂", "014_gorilla_elite": "泥トロル", "003_boar": "泥の猪" };
-
-const CELL = 2, WALL_H = 2.6, EYE = 1.15;
-// 階ごとの空気：霧の色、燭台の炎の色、壁の色味
-const THEMES = [
-  { fog: 0x050302, flame: 0xffb060, light: 0xff8a30, wall: 0xffffff },
-  { fog: 0x02050a, flame: 0x80c8ff, light: 0x4a9cff, wall: 0xc8d4e8 },
-  { fog: 0x050309, flame: 0xc890ff, light: 0x9a5cff, wall: 0xc4bccc },
-  { fog: 0x070500, flame: 0xffd27a, light: 0xffb340, wall: 0xf0dcb0 },
-  { fog: 0x090101, flame: 0xff6a50, light: 0xff3020, wall: 0xe0b8b0 }
-];
-
-// ===== 描画の土台 =====
-const view = document.getElementById("view");
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-view.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020101);
-scene.fog = new THREE.FogExp2(0x040201, 0.11);
-const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 80);
-
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.5, 0.88);
-composer.addPass(bloom);
-// 周辺減光と粒状感（映画のような質感）
-const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uHurt: { value: 0 } },
-  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
-  fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime; uniform float uHurt; varying vec2 vUv;
-    float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uTime) * 43758.5453); }
-    void main(){
-      vec2 c = vUv - 0.5;
-      float ca = 0.0018 * length(c) * 2.0;
-      vec3 col;
-      col.r = texture2D(tDiffuse, vUv + c * ca).r;
-      col.g = texture2D(tDiffuse, vUv).g;
-      col.b = texture2D(tDiffuse, vUv - c * ca).b;
-      float vig = smoothstep(0.85, 0.25, length(c * vec2(1.0, 0.85)));
-      col *= mix(0.35, 1.0, vig);
-      col = mix(col, col * vec3(1.03, 0.99, 0.95), 0.5);
-      col += (rnd(vUv * 900.0) - 0.5) * 0.018;
-      col = mix(col, vec3(0.5, 0.0, 0.0), uHurt * (1.0 - vig) * 0.8);
-      gl_FragColor = vec4(col, 1.0);
-    }`
-});
-composer.addPass(grade);
-composer.addPass(new OutputPass());
-
-// ===== 手続き生成の質感（石壁・石床・天井）：高さ情報から法線を計算し、凹凸に光が当たるようにする =====
-function makeNoise(period, seed) {
-  const g = new Float32Array(period * period);
-  let x = seed * 9301 + 49297;
-  for (let i = 0; i < g.length; i++) { x = (x * 9301 + 49297) % 233280; g[i] = x / 233280; }
-  return (u, v) => { // u,v は 0〜period で周期的（継ぎ目なし）
-    const x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0;
-    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-    const a = (X, Y) => g[((Y % period + period) % period) * period + ((X % period + period) % period)];
-    const top = a(x0, y0) + (a(x0 + 1, y0) - a(x0, y0)) * sx;
-    const bot = a(x0, y0 + 1) + (a(x0 + 1, y0 + 1) - a(x0, y0 + 1)) * sx;
-    return top + (bot - top) * sy;
-  };
-}
-function fbm(noises, u, v) {
-  let s = 0, amp = 0.5, f = 1;
-  for (const n of noises) { s += n(u * f, v * f) * amp; amp *= 0.5; f *= 2; }
-  return s;
-}
-function makeStone(kind) {
-  const S = 512;
-  const rows = kind === "wall" ? 7 : kind === "floor" ? 4 : 2;
-  const cols = kind === "wall" ? 3 : kind === "floor" ? 3 : 2;
-  const base = kind === "wall" ? [104, 98, 90] : kind === "floor" ? [82, 76, 70] : [56, 52, 50];
-  const noises = [8, 16, 32, 64, 128].map((p, k) => { const n = makeNoise(p, k * 17 + (kind === "wall" ? 3 : kind === "floor" ? 7 : 11)); return (u, v) => n(u * p / 8, v * p / 8); });
-  const big = makeNoise(4, 99);
-  const height = new Float32Array(S * S);
-  const albedo = new Uint8ClampedArray(S * S * 4);
-  // 石ごとのばらつき
-  const brickRand = [];
-  for (let r = 0; r < rows; r++) { brickRand[r] = []; for (let c = 0; c <= cols; c++) brickRand[r][c] = [Math.random(), Math.random(), Math.random()]; }
-  const mortar = kind === "ceil" ? 0.03 : 0.045;
-  for (let y = 0; y < S; y++) {
-    const v = y / S, ry = v * rows, r = Math.floor(ry), fy = ry - r;
-    const off = (r % 2) * 0.5;
-    for (let x = 0; x < S; x++) {
-      const u = x / S;
-      let cx = u * cols + off; const c = Math.floor(cx) % cols, fx = cx - Math.floor(cx);
-      const br = brickRand[r][(c + cols) % cols];
-      // 目地までの距離（石の縁が丸く欠けたように見える）
-      const ex = Math.min(fx, 1 - fx) * (S / cols), ey = Math.min(fy, 1 - fy) * (S / rows);
-      const nEdge = fbm(noises, u * 8, v * 8);
-      const edge = Math.min(ex, ey) / (S * mortar) + (nEdge - 0.5) * 1.6;
-      const inStone = Math.max(0, Math.min(1, edge));
-      const bevel = Math.pow(inStone, 0.45);
-      const rough = fbm(noises, u * 8 + br[0] * 3, v * 8 + br[1] * 3);
-      const h = bevel * (0.62 + br[2] * 0.18) + (rough - 0.5) * 0.28 * bevel;
-      height[y * S + x] = h;
-      // 色：石ごとの色味、表面のまだら、目地の暗さ、苔
-      const tint = (br[0] - 0.5) * 30, blot = (big(u * 4, v * 4) - 0.5) * 34 + (rough - 0.5) * 44;
-      const ao = 0.35 + 0.65 * bevel;
-      let R = (base[0] + tint + blot) * ao, G = (base[1] + tint * 0.9 + blot) * ao, B = (base[2] + tint * 0.8 + blot * 0.9) * ao;
-      if (kind === "wall" && inStone < 0.6) { const m = (fbm(noises, u * 8 + 5, v * 8) - 0.4) * 1.4; if (m > 0) { R -= 18 * m; G += 6 * m; B -= 14 * m; } }
-      const k = (y * S + x) * 4;
-      albedo[k] = R; albedo[k + 1] = G; albedo[k + 2] = B; albedo[k + 3] = 255;
-    }
-  }
-  // ひび割れ（細い暗い線）
-  const c1 = document.createElement("canvas"); c1.width = c1.height = S;
-  const g1 = c1.getContext("2d"); g1.putImageData(new ImageData(albedo, S, S), 0, 0);
-  g1.strokeStyle = "rgba(10,8,6,.55)"; g1.lineWidth = 1;
-  for (let n = 0; n < (kind === "ceil" ? 6 : 14); n++) {
-    let px = Math.random() * S, py = Math.random() * S, a = Math.random() * Math.PI * 2;
-    g1.beginPath(); g1.moveTo(px, py);
-    for (let t = 0; t < 14; t++) { a += (Math.random() - 0.5) * 1.1; px += Math.cos(a) * 6; py += Math.sin(a) * 6; g1.lineTo(px, py);
-      const hx = Math.floor(px), hy = Math.floor(py); if (hx >= 0 && hy >= 0 && hx < S && hy < S) height[hy * S + hx] -= 0.12; }
-    g1.stroke();
-  }
-  // 高さから法線を計算
-  const nrm = new Uint8ClampedArray(S * S * 4), str = kind === "ceil" ? 3.0 : 4.0;
-  const H = (x, y) => height[((y + S) % S) * S + ((x + S) % S)];
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const dx = (H(x + 1, y) - H(x - 1, y)) * str, dy = (H(x, y + 1) - H(x, y - 1)) * str;
-    const l = Math.hypot(dx, dy, 1), k = (y * S + x) * 4;
-    nrm[k] = (-dx / l * 0.5 + 0.5) * 255; nrm[k + 1] = (dy / l * 0.5 + 0.5) * 255; nrm[k + 2] = (1 / l * 0.5 + 0.5) * 255; nrm[k + 3] = 255;
-  }
-  const c2 = document.createElement("canvas"); c2.width = c2.height = S;
-  c2.getContext("2d").putImageData(new ImageData(nrm, S, S), 0, 0);
-  const map = new THREE.CanvasTexture(c1); map.colorSpace = THREE.SRGBColorSpace;
-  const normal = new THREE.CanvasTexture(c2);
-  for (const t of [map, normal]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); }
-  return { map, bump: normal };
-}
-const wallTex = makeStone("wall"), floorTex = makeStone("floor"), ceilTex = makeStone("ceil");
-const wallMat = new THREE.MeshStandardMaterial({ map: wallTex.map, normalMap: wallTex.bump, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.9, metalness: 0.0 });
-
-function glowTexture(inner, outer) {
-  const c = document.createElement("canvas"); c.width = c.height = 128;
-  const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gr.addColorStop(0, inner); gr.addColorStop(0.35, outer); gr.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
-const flameTex = glowTexture("rgba(255,250,220,1)", "rgba(255,140,40,.8)");
-const runeTex = glowTexture("rgba(200,240,255,1)", "rgba(80,160,255,.6)");
-const dustTex = glowTexture("rgba(255,230,190,.9)", "rgba(255,200,140,.25)");
-
-// ===== 火花（攻撃が当たった所から飛び散る） =====
-const SP = 260, spGeo = new THREE.BufferGeometry();
-const spPos = new Float32Array(SP * 3), spVel = new Float32Array(SP * 3), spLife = new Float32Array(SP);
-spGeo.setAttribute("position", new THREE.BufferAttribute(spPos, 3));
-const sparks = new THREE.Points(spGeo, new THREE.PointsMaterial({ map: flameTex, color: 0xffd090, size: 0.09, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-sparks.frustumCulled = false;
-let spNext = 0;
-function burst(at, n, spread) {
-  for (let i = 0; i < n; i++) {
-    const k = spNext = (spNext + 1) % SP;
-    spPos.set([at.x, at.y, at.z], k * 3);
-    spVel.set([(Math.random() - 0.5) * spread, Math.random() * spread * 0.9, (Math.random() - 0.5) * spread], k * 3);
-    spLife[k] = 0.5 + Math.random() * 0.5;
-  }
-}
-
-// ===== 状態 =====
-const st = { floor: 0, x: 1, y: 1, dir: 0, seen: {}, busy: false, dead: false, hp: 120, maxHp: 120 };
-let battle = null;
-let world = null;              // 現在の階の3D物体
-const torchLight = new THREE.PointLight(0xffc08a, 9, 20, 1.25);
-torchLight.castShadow = true;
-torchLight.shadow.mapSize.set(512, 512);
-torchLight.shadow.bias = -0.004;
-torchLight.shadow.radius = 4;
-camera.add(torchLight);
-torchLight.position.set(0.35, -0.15, 0.1);
-scene.add(camera);
-scene.add(new THREE.HemisphereLight(0x2a2a34, 0x0a0806, 0.5));
-
-// 舞う塵
-const DUST = 600;
-const dustGeo = new THREE.BufferGeometry();
-const dustPos = new Float32Array(DUST * 3), dustVel = new Float32Array(DUST * 3);
-for (let i = 0; i < DUST; i++) {
-  dustPos.set([(Math.random() - 0.5) * 14, Math.random() * WALL_H, (Math.random() - 0.5) * 14], i * 3);
-  dustVel.set([(Math.random() - 0.5) * 0.004, (Math.random() - 0.3) * 0.002, (Math.random() - 0.5) * 0.004], i * 3);
-}
-dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
-const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ map: dustTex, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
-scene.add(dust);
-scene.add(sparks);
-
-const tile = (x, y) => (FLOORS[st.floor].map[y] || "")[x] || "#";
-const isWall = (x, y) => tile(x, y) === "#";
-const wpos = (x, y) => new THREE.Vector3(x * CELL, 0, y * CELL);
-
-// ===== 階の組み立て =====
-function buildFloor(fi) {
-  if (world) { scene.remove(world.group); world.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
-  const F = FLOORS[fi], H = F.map.length, W = F.map[0].length;
-  const TH = THEMES[fi] || THEMES[0];
-  scene.fog.color.setHex(TH.fog); scene.background.setHex(TH.fog);
-  wallMat.color.setHex(TH.wall);
-  const group = new THREE.Group();
-  const flames = [], monsters = [], runes = [];
-
-  // 壁（同じ形を大量に並べる）
-  const walls = [];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (F.map[y][x] === "#") walls.push([x, y]);
-  const wg = new THREE.BoxGeometry(CELL, WALL_H, CELL);
-  const uv = wg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 1, uv.getY(i) * 1.3);
-  const inst = new THREE.InstancedMesh(wg, wallMat, walls.length);
-  const m4 = new THREE.Matrix4();
-  walls.forEach(([x, y], i) => { m4.makeTranslation(x * CELL, WALL_H / 2, y * CELL); inst.setMatrixAt(i, m4); });
-  inst.castShadow = true; inst.receiveShadow = true;
-  group.add(inst);
-
-  // 床と天井
-  const fm = floorTex.map.clone(), fb = floorTex.bump.clone();
-  for (const t of [fm, fb]) { t.repeat.set(W, H); t.needsUpdate = true; }
-  const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL, H * CELL),
-    new THREE.MeshStandardMaterial({ map: fm, normalMap: fb, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.82 }));
-  floorMesh.rotation.x = -Math.PI / 2; floorMesh.position.set((W - 1) * CELL / 2, 0, (H - 1) * CELL / 2);
-  floorMesh.receiveShadow = true; group.add(floorMesh);
-  const cm = ceilTex.map.clone(), cb = ceilTex.bump.clone();
-  for (const t of [cm, cb]) { t.repeat.set(W, H); t.needsUpdate = true; }
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W * CELL, H * CELL),
-    new THREE.MeshStandardMaterial({ map: cm, normalMap: cb, normalScale: new THREE.Vector2(1.1, 1.1), roughness: 1 }));
-  ceil.rotation.x = Math.PI / 2; ceil.position.set((W - 1) * CELL / 2, WALL_H, (H - 1) * CELL / 2);
-  group.add(ceil);
-
-  // 床のくぼみに溜まる水たまり（光を映す）
-  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.32, depthWrite: false });
-  for (let n = 0; n < 10; n++) {
-    const x = 1 + Math.floor(Math.random() * (W - 2)), y = 1 + Math.floor(Math.random() * (H - 2));
-    if (F.map[y][x] === "#") continue;
-    const p = new THREE.Mesh(new THREE.CircleGeometry(0.3 + Math.random() * 0.3, 24), puddleMat);
-    p.scale.set(1, 0.6 + Math.random() * 0.4, 1);
-    p.rotation.x = -Math.PI / 2; p.position.set(x * CELL + (Math.random() - 0.5), 0.005, y * CELL + (Math.random() - 0.5));
-    p.receiveShadow = true; group.add(p);
-  }
-
-  // 壁の松明（燭台）
-  const cands = [];
-  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-    if (F.map[y][x] === "#") continue;
-    for (const d of DIRS) if (F.map[y + d.dy][x + d.dx] === "#") cands.push({ x, y, d });
-  }
-  cands.sort(() => Math.random() - 0.5);
-  const sconceMat = new THREE.MeshStandardMaterial({ color: 0x2a1c10, roughness: 0.6, metalness: 0.7 });
-  for (const c of cands.slice(0, 9)) {
-    const px = c.x * CELL + c.d.dx * (CELL / 2 - 0.08), pz = c.y * CELL + c.d.dy * (CELL / 2 - 0.08);
-    const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.03, 0.35, 8), sconceMat);
-    holder.position.set(px, 1.55, pz); holder.castShadow = true; group.add(holder);
-    const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, color: TH.flame, blending: THREE.AdditiveBlending, depthWrite: false }));
-    fl.position.set(px, 1.82, pz); fl.scale.set(0.42, 0.6, 1); group.add(fl);
-    const pl = new THREE.PointLight(TH.light, 9, 7, 1.8);
-    pl.position.set(px - c.d.dx * 0.25, 1.8, pz - c.d.dy * 0.25); group.add(pl);
-    flames.push({ fl, pl, seed: Math.random() * 100 });
-  }
-
-  // 特別なマス（階段・宝箱・碑文・鍵・玉座）
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const ch = F.map[y][x], p = wpos(x, y);
-    if (ch === ">" || ch === "<") {
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.62, 40), new THREE.MeshBasicMaterial({ color: ch === ">" ? 0x7fd0ff : 0xffe08a, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.set(p.x, 0.02, p.z); group.add(ring);
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: runeTex, color: ch === ">" ? 0x7fd0ff : 0xffe08a, blending: THREE.AdditiveBlending, depthWrite: false }));
-      glow.position.set(p.x, 0.5, p.z); glow.scale.set(1.2, 1.2, 1); group.add(glow);
-      runes.push(glow);
-    }
-    if (ch === "T") {
-      const chest = new THREE.Group();
-      const wood = new THREE.MeshStandardMaterial({ color: 0x5a3416, roughness: 0.7 });
-      const gold = new THREE.MeshStandardMaterial({ color: 0xc8a040, roughness: 0.3, metalness: 0.9, emissive: 0x3a2400 });
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.6), wood); body.position.y = 0.25;
-      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 16, 1, false, 0, Math.PI), wood); lid.rotation.z = Math.PI / 2; lid.position.y = 0.5;
-      const band = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.64), gold); band.position.y = 0.3;
-      for (const m of [body, lid, band]) { m.castShadow = true; m.receiveShadow = true; chest.add(m); }
-      chest.position.set(p.x, 0, p.z); group.add(chest);
-    }
-    if (ch === "B") {
-      const throne = new THREE.Group();
-      const stone = new THREE.MeshStandardMaterial({ color: 0x2a2224, roughness: 0.55, metalness: 0.2 });
-      const gold = new THREE.MeshStandardMaterial({ color: 0xc8a040, roughness: 0.25, metalness: 1, emissive: 0x2a1800 });
-      const cloth = new THREE.MeshStandardMaterial({ color: 0x7a0c10, roughness: 0.9 });
-      const parts = [
-        [new THREE.BoxGeometry(1.3, 0.45, 1.0), stone, 0, 0.22, 0],
-        [new THREE.BoxGeometry(1.3, 2.2, 0.22), stone, 0, 1.1, -0.45],
-        [new THREE.BoxGeometry(0.18, 0.75, 0.9), stone, -0.6, 0.62, 0],
-        [new THREE.BoxGeometry(0.18, 0.75, 0.9), stone, 0.6, 0.62, 0],
-        [new THREE.BoxGeometry(1.0, 0.06, 0.75), cloth, 0, 0.48, 0.05],
-        [new THREE.BoxGeometry(0.9, 1.5, 0.04), cloth, 0, 1.15, -0.33],
-        [new THREE.BoxGeometry(1.42, 0.08, 0.3), gold, 0, 2.2, -0.45],
-        [new THREE.ConeGeometry(0.12, 0.35, 8), gold, -0.5, 2.42, -0.45],
-        [new THREE.ConeGeometry(0.16, 0.5, 8), gold, 0, 2.5, -0.45],
-        [new THREE.ConeGeometry(0.12, 0.35, 8), gold, 0.5, 2.42, -0.45]
-      ];
-      for (const [geo, mat, x, y, z] of parts) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; throne.add(m); }
-      throne.position.set(p.x, 0, p.z); throne.rotation.y = -Math.PI / 2; group.add(throne);
-      const red = new THREE.PointLight(0xff2010, 14, 9, 1.6); red.position.set(p.x - 0.8, 2.2, p.z); group.add(red);
-      flames.push({ fl: new THREE.Object3D(), pl: red, seed: 3 });
-    }
-    if (ch === "E" || ch === "K") {
-      const col = ch === "E" ? 0x9fe0ff : ch === "K" ? 0xffd27a : 0xff6060;
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: runeTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false }));
-      s.position.set(p.x, 1.0, p.z); s.scale.set(0.7, 0.7, 1); group.add(s); runes.push(s);
-    }
-  }
-
-  // 徘徊するモンスター（光を受ける立て看板として表示）
-  const loader = new THREE.TextureLoader();
-  const floorsCells = [];
-  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (F.map[y][x] === "." ) floorsCells.push([x, y]);
-  floorsCells.sort(() => Math.random() - 0.5);
-  const start = F.start;
-  for (const [x, y] of floorsCells.filter(([x, y]) => Math.abs(x - start[0]) + Math.abs(y - start[1]) > 5).slice(0, 6)) {
-    const file = MONSTER_FILES[Math.floor(Math.random() * MONSTER_FILES.length)];
-    const tex = loader.load(`img/monsters/${file}.png`); tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0x000000, transparent: true, alphaTest: 0.35, roughness: 0.8, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), mat);
-    mesh.position.set(x * CELL, 0.85, y * CELL); mesh.castShadow = true;
-    mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.35 });
-    group.add(mesh);
-    const hp = 18 + fi * 14 + Math.floor(Math.random() * 10);
-    monsters.push({ mesh, x, y, name: MONSTER_NAMES[file], seed: Math.random() * 100, hp, max: hp, flash: 0, dying: 0, lunge: 0 });
-  }
-
-  scene.add(group);
-  world = { group, flames, monsters, runes, W, H };
-  document.getElementById("floorName").textContent = F.name;
-}
-
-// ===== 移動 =====
-const anim = { from: new THREE.Vector3(), to: new THREE.Vector3(), yaw0: 0, yaw1: 0, t: 1, dur: 0.22, bob: 0 };
-const yawOf = d => -d * Math.PI / 2;
-function placeCamera() {
-  camera.position.set(st.x * CELL, EYE, st.y * CELL);
-  camera.rotation.set(0, yawOf(st.dir), 0, "YXZ");
-  anim.from.copy(camera.position); anim.to.copy(camera.position);
-  anim.yaw0 = anim.yaw1 = yawOf(st.dir); anim.t = 1;
-}
-function startAnim(dur) { anim.from.copy(camera.position); anim.yaw0 = camera.rotation.y; anim.t = 0; anim.dur = dur; anim.start = performance.now(); }
-
-let msgTimer = 0;
-function say(t, keep) {
-  const el = document.getElementById("msg"); el.textContent = t; el.style.opacity = 1;
-  clearTimeout(msgTimer); if (!keep) msgTimer = setTimeout(() => el.style.opacity = 0.35, 5200);
-}
-
-function reveal() {
-  const k = `f${st.floor}`; st.seen[k] = st.seen[k] || {};
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) st.seen[k][`${st.x + dx},${st.y + dy}`] = 1;
-  document.getElementById("pos").textContent = `向き ${DIRS[st.dir].n}　位置 横${st.x}・縦${st.y}`;
-  drawMap();
-}
-
-function enterFloor(fi, fromStairs) {
-  const fade = document.getElementById("fade");
-  fade.style.opacity = 1; st.busy = true;
-  setTimeout(() => {
-    st.floor = fi;
-    const F = FLOORS[fi];
-    if (fromStairs) {
-      const back = F.stairs.find(s => s.to === fromStairs.from);
-      if (back) { st.x = back.x; st.y = back.y; } else { st.x = F.start[0]; st.y = F.start[1]; }
-    } else { st.x = F.start[0]; st.y = F.start[1]; }
-    st.dir = F.start[2];
-    // 階段の上に降りたら、通路側を向く
-    for (let i = 0; i < 4; i++) { const d = DIRS[st.dir]; if (!isWall(st.x + d.dx, st.y + d.dy)) break; st.dir = (st.dir + 1) % 4; }
-    buildFloor(fi); placeCamera(); reveal();
-    say(INTRO[fi] || F.name);
-    setTimeout(() => { fade.style.opacity = 0; st.busy = false; }, 120);
-  }, 650);
-}
-
-function finishAnim() {
-  camera.position.copy(anim.to); camera.position.y = EYE;
-  camera.rotation.y = yawOf(st.dir); anim.t = 1;
-}
-function act(c) {
-  if (st.busy) return;
-  if (battle) { if (c === "attack" || c === "forward") attack(); else if (c === "flee") flee(); return; }
-  if (c === "attack" || c === "flee") return;
-  // 描画が重い環境でも操作が詰まらないよう、時間が過ぎていれば前の動きを完了させる
-  if (anim.t < 1) {
-    if ((performance.now() - anim.start) / 1000 < anim.dur) return;
-    finishAnim();
-  }
-  if (c === "left" || c === "right" || c === "turn") {
-    st.dir = (st.dir + (c === "left" ? 3 : c === "right" ? 1 : 2)) % 4;
-    startAnim(c === "turn" ? 0.34 : 0.2);
-    let target = yawOf(st.dir);
-    while (target - anim.yaw0 > Math.PI) target -= Math.PI * 2;
-    while (target - anim.yaw0 < -Math.PI) target += Math.PI * 2;
-    if (c === "turn" && Math.abs(target - anim.yaw0) < 0.01) target = anim.yaw0 + Math.PI;
-    anim.yaw1 = target; anim.to.copy(camera.position);
-    reveal(); return;
-  }
-  if (c === "forward") {
-    const d = DIRS[st.dir], nx = st.x + d.dx, ny = st.y + d.dy;
-    if (isWall(nx, ny)) { say("冷たい石壁だ。"); bump(); return; }
-    const mon = world.monsters.find(m => m.x === nx && m.y === ny && m.mesh.visible && !m.dying);
-    if (mon) { startBattle(mon); return; }
-    st.x = nx; st.y = ny;
-    startAnim(0.26); anim.to.set(nx * CELL, EYE, ny * CELL); anim.yaw1 = anim.yaw0;
-    reveal();
-    const ch = tile(nx, ny);
-    const stair = FLOORS[st.floor].stairs.find(s => s.x === nx && s.y === ny);
-    if (stair) { say(stair.to > st.floor ? "階段を下りる……" : "階段を上る……", true); setTimeout(() => enterFloor(stair.to, { from: st.floor }), 300); }
-    else if (ch === "T") say("宝箱がある。古い錠前が鈍く光っている。");
-    else if (ch === "E") say("壁に古い文字が刻まれている。『玄室に入る時は、帰り道を数えよ』");
-    else if (ch === "K") say("床の隙間で、何かが金色に光っている。");
-    else if (ch === "B") say("玉座の前に立った。冷たい気配が背筋を這い上がる。");
-  }
-}
-let hurtT = 0; function hurt() { hurtT = 1; }
-let shakeT = 0;
-function updateParty() {
-  document.getElementById("php").textContent = `${st.hp} / ${st.maxHp}`;
-  document.querySelector("#pbar > i").style.width = `${Math.max(0, st.hp / st.maxHp * 100)}%`;
-}
-function updateBattle() {
-  const el = document.getElementById("battle");
-  if (!battle) { el.style.display = "none"; return; }
-  el.style.display = "block";
-  document.getElementById("bname").textContent = battle.mon.name;
-  document.querySelector("#bbar > i").style.width = `${Math.max(0, battle.mon.hp / battle.mon.max * 100)}%`;
-}
-function popDamage(n, color) {
-  const el = document.getElementById("dmg");
-  el.textContent = n; el.style.color = color || "#fff2c0";
-  el.animate([{ opacity: 0, transform: "translate(-50%, 20px) scale(.6)" }, { opacity: 1, transform: "translate(-50%, 0) scale(1.15)", offset: 0.25 }, { opacity: 0, transform: "translate(-50%, -40px) scale(1)" }], { duration: 900, easing: "ease-out" });
-}
-function startBattle(mon) {
-  battle = { mon, lock: false };
-  // 怪物が一歩前に出てくる
-  mon.lunge = 1;
-  say(`${mon.name}が立ちはだかる！`, true);
-  updateBattle();
-}
-function attack() {
-  if (!battle || battle.lock) return;
-  battle.lock = true;
-  const m = battle.mon;
-  const crit = Math.random() < 0.15;
-  const dmg = Math.floor((10 + Math.random() * 9) * (crit ? 2 : 1));
-  m.hp -= dmg; m.flash = 1; shakeT = crit ? 1 : 0.6;
-  const at = m.mesh.position.clone(); at.y = 1.0;
-  burst(at, crit ? 120 : 70, crit ? 5 : 3.2);
-  popDamage(crit ? `会心 ${dmg}` : dmg, crit ? "#ffe066" : "#fff2c0");
-  say(crit ? `会心の一撃！ ${m.name}に${dmg}の傷を負わせた。` : `${m.name}に${dmg}の傷を負わせた。`, true);
-  updateBattle();
-  if (m.hp <= 0) {
-    m.dying = 1; burst(at, 160, 2.2);
-    setTimeout(() => { say(`${m.name}を倒した。闇の奥で、何かが崩れる音がした。`); battle = null; updateBattle(); }, 500);
-    return;
-  }
-  setTimeout(() => enemyTurn(m), 650);
-}
-function enemyTurn(m) {
-    if (!battle) return;
-    m.lunge = 1;
-    const hit = Math.random() < 0.75;
-    if (hit) {
-      const d = Math.floor(4 + Math.random() * (6 + st.floor * 3));
-      st.hp = Math.max(0, st.hp - d); hurt(); shakeT = 0.8; popDamage(`−${d}`, "#ff7060");
-      say(`${m.name}の反撃！ 隊列は${d}の傷を負った。`, true);
-    } else say(`${m.name}の反撃は空を切った。`, true);
-    updateParty();
-    if (st.hp <= 0) {
-      say("隊列は倒れた……。意識が遠のき、気がつくと階の入口に戻っていた。", true);
-      battle = null; updateBattle();
-      setTimeout(() => { st.hp = st.maxHp; updateParty(); enterFloor(st.floor); }, 1600);
-      return;
-    }
-    battle.lock = false;
-}
-function flee() {
-  if (!battle || battle.lock) return;
-  if (Math.random() < 0.7) { say("隊列は身を引いた。怪物は追ってこない。"); battle = null; updateBattle(); }
-  else { battle.lock = true; say("退こうとしたが、回り込まれた！", true); setTimeout(() => enemyTurn(battle.mon), 500); }
-}
-let bumpT = 0; function bump() { bumpT = 1; }
-
-addEventListener("keydown", e => {
-  const map = { KeyW: "forward", ArrowUp: "forward", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyX: "turn", ArrowDown: "turn",
-    KeyZ: "attack", Enter: "attack", Space: "attack", Numpad1: "attack", Escape: "flee", Numpad2: "flee" };
-  const c = map[e.code]; if (c) { e.preventDefault(); act(c); }
-});
-document.querySelectorAll("#touch button").forEach(b => b.addEventListener("pointerdown", e => { e.preventDefault(); act(b.dataset.c); }));
-
-// ===== 地図 =====
-function drawMap() {
-  const c = document.getElementById("map"), g = c.getContext("2d"), F = FLOORS[st.floor];
-  const n = F.map.length, s = Math.floor(c.width / n), seen = st.seen[`f${st.floor}`] || {};
-  g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
-  for (let y = 0; y < n; y++) for (let x = 0; x < F.map[y].length; x++) {
-    if (!seen[`${x},${y}`]) continue;
-    const ch = F.map[y][x];
-    g.fillStyle = ch === "#" ? "#3a332c" : ch === ">" || ch === "<" ? "#3c7fa8" : "#1d3a24";
-    g.fillRect(x * s, y * s, s - 1, s - 1);
-  }
-  const d = DIRS[st.dir], cx = st.x * s + s / 2, cy = st.y * s + s / 2;
-  g.fillStyle = "#ff6666"; g.beginPath();
-  g.moveTo(cx + d.dx * s * 0.6, cy + d.dy * s * 0.6);
-  g.lineTo(cx - d.dy * s * 0.45 - d.dx * s * 0.35, cy + d.dx * s * 0.45 - d.dy * s * 0.35);
-  g.lineTo(cx + d.dy * s * 0.45 - d.dx * s * 0.35, cy - d.dx * s * 0.45 - d.dy * s * 0.35);
-  g.fill();
-}
-
-// ===== 毎フレームの更新 =====
-const clock = new THREE.Clock();
-const perf = { frames: 0, acc: 0, t0: 0, lowered: false, useComposer: true };
-function lowerQuality() {
-  perf.lowered = true;
-  renderer.shadowMap.enabled = false; torchLight.castShadow = false;
-  renderer.setPixelRatio(1); composer.setPixelRatio ? composer.setPixelRatio(1) : null;
-  composer.setSize(innerWidth, innerHeight);
-  if (world) world.flames.forEach((f, i) => { if (i > 3) f.pl.visible = false; });
-  scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
-}
-const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-function tick() {
-  const dt = Math.min(0.05, clock.getDelta()), time = clock.elapsedTime;
-  if (anim.t < 1) {
-    anim.t = Math.min(1, (performance.now() - anim.start) / 1000 / anim.dur);
-    const k = ease(anim.t);
-    camera.position.lerpVectors(anim.from, anim.to, k);
-    camera.rotation.y = anim.yaw0 + (anim.yaw1 - anim.yaw0) * k;
-    const moving = anim.from.distanceToSquared(anim.to) > 0.01;
-    camera.position.y = EYE + (moving ? Math.sin(k * Math.PI) * 0.06 : 0);
-    if (anim.t >= 1) camera.rotation.y = yawOf(st.dir);
-  }
-  // 火花
-  for (let i = 0; i < SP; i++) {
-    if (spLife[i] <= 0) { spPos[i * 3 + 1] = -99; continue; }
-    spLife[i] -= dt;
-    spVel[i * 3 + 1] -= 9 * dt;
-    spPos[i * 3] += spVel[i * 3] * dt; spPos[i * 3 + 1] += spVel[i * 3 + 1] * dt; spPos[i * 3 + 2] += spVel[i * 3 + 2] * dt;
-    if (spPos[i * 3 + 1] < 0.02) { spPos[i * 3 + 1] = 0.02; spVel[i * 3 + 1] *= -0.35; }
-  }
-  spGeo.attributes.position.needsUpdate = true;
-  // 打撃の揺れ
-  if (shakeT > 0) {
-    camera.position.x = anim.to.x + (Math.random() - 0.5) * 0.06 * shakeT;
-    camera.position.y = EYE + (Math.random() - 0.5) * 0.05 * shakeT;
-    shakeT = Math.max(0, shakeT - dt * 3);
-    if (shakeT === 0) { camera.position.x = anim.to.x; camera.position.y = EYE; }
-  }
-  // 壁にぶつかった時の小さな揺れ
-  if (bumpT > 0) { camera.position.x += (Math.random() - 0.5) * 0.03 * bumpT; bumpT = Math.max(0, bumpT - dt * 4); }
-  // 松明のゆらぎ
-  torchLight.intensity = 9 + Math.sin(time * 9.1) * 0.7 + Math.sin(time * 23.7) * 0.45 + (Math.random() - 0.5) * 0.5;
-  if (world) {
-    for (const f of world.flames) {
-      const k = 1 + Math.sin(time * 11 + f.seed) * 0.12 + (Math.random() - 0.5) * 0.08;
-      f.fl.scale.set(0.42 * k, 0.6 * k, 1); f.pl.intensity = 8 * k;
-    }
-    for (const r of world.runes) r.material.opacity = 0.6 + Math.sin(time * 2.2) * 0.3;
-    for (const m of world.monsters) {
-      if (!m.mesh.visible) continue;
-      const home = new THREE.Vector3(m.x * CELL, 0, m.y * CELL);
-      const toCam = new THREE.Vector3(camera.position.x - home.x, 0, camera.position.z - home.z);
-      const dist = toCam.length(); toCam.normalize();
-      m.lunge = Math.max(0, m.lunge - dt * 3);
-      const off = Math.sin(m.lunge * Math.PI) * 0.3;
-      m.mesh.position.set(home.x + toCam.x * Math.min(off, Math.max(0, dist - 1.4)), 0.85 + Math.sin(time * 1.6 + m.seed) * 0.03, home.z + toCam.z * Math.min(off, Math.max(0, dist - 1.4)));
-      m.mesh.lookAt(camera.position.x, m.mesh.position.y, camera.position.z);
-      m.flash = Math.max(0, m.flash - dt * 4);
-      m.mesh.material.emissive.setScalar(m.flash * 1.6);
-      if (m.dying) {
-        m.dying = Math.max(0, m.dying - dt * 1.4);
-        m.mesh.material.opacity = m.dying; m.mesh.material.alphaTest = 0.35 + (1 - m.dying) * 0.6;
-        m.mesh.scale.set(1 + (1 - m.dying) * 0.25, 1 - (1 - m.dying) * 0.5, 1);
-        if (m.dying <= 0) m.mesh.visible = false;
-      }
-    }
-  }
-  // 塵をプレイヤーの周りに漂わせる
-  const p = dustGeo.attributes.position.array;
-  for (let i = 0; i < DUST; i++) {
-    let x = p[i * 3] + dustVel[i * 3], y = p[i * 3 + 1] + dustVel[i * 3 + 1], z = p[i * 3 + 2] + dustVel[i * 3 + 2];
-    if (y > WALL_H) y = 0.05; if (y < 0) y = WALL_H - 0.05;
-    if (Math.abs(x - camera.position.x) > 7) x = camera.position.x + (Math.random() - 0.5) * 12;
-    if (Math.abs(z - camera.position.z) > 7) z = camera.position.z + (Math.random() - 0.5) * 12;
-    p[i * 3] = x; p[i * 3 + 1] = y; p[i * 3 + 2] = z;
-  }
-  dustGeo.attributes.position.needsUpdate = true;
-  grade.uniforms.uTime.value = time;
-  grade.uniforms.uHurt.value = hurtT; hurtT = Math.max(0, hurtT - dt * 1.5);
-  perf.frames++;
-  if (!perf.lowered && time > 4 && perf.frames > 0 && time - perf.t0 > 3) {
-    const fps = perf.frames / (time - perf.t0);
-    if (fps < 28) { lowerQuality(); }
-    perf.frames = 0; perf.t0 = time;
-  }
-  if (perf.lowered && !perf.useComposer) renderer.render(scene, camera); else composer.render(dt);
-  requestAnimationFrame(tick);
-}
-
-addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
-});
-
-// 開始
-st.x = FLOORS[0].start[0]; st.y = FLOORS[0].start[1]; st.dir = FLOORS[0].start[2];
-buildFloor(0); placeCamera(); reveal(); updateParty();
-say("序章。奪われた玉座を取り戻すため、六人の隊列は奈落の城デスフォールへ降りていく。――立体試作版");
-setTimeout(() => { document.getElementById("fade").style.opacity = 0; }, 200);
-window.__ready = true;
-window.__dbg = () => ({ st, monsters: world.monsters.map(m => [m.x, m.y, m.name]) });
-window.__tp = (x, y, d) => { st.x = x; st.y = y; st.dir = d; placeCamera(); reveal(); };
-window.__floor = (f) => enterFloor(f);
-tick();
-</script>
+<script type="module" src="3d/game.js"></script>
 </body>
 </html>
