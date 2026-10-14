@@ -113,7 +113,7 @@ const audio = {
     if (!this.ctx) return;
     if (this.amb) { const old = this.amb; old.g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.6); setTimeout(() => old.nodes.forEach(n => { try { n.stop(); } catch {} }), 3000); }
     const base = THEMES[fi]?.drone || 55, g = this.ctx.createGain(); g.gain.value = 0.0001;
-    g.gain.setTargetAtTime(1, this.ctx.currentTime, 1.5); g.connect(this.master); if (this.verb) g.connect(this.verb);
+    g.gain.setTargetAtTime(0.55, this.ctx.currentTime, 1.5); g.connect(this.master); if (this.verb) g.connect(this.verb);
     const nodes = [];
     for (const [f, v] of [[base, 0.05], [base * 1.498, 0.025], [base * 0.5, 0.05]]) {
       const o = this.ctx.createOscillator(), og = this.ctx.createGain(); o.type = "sine"; o.frequency.value = f; o.detune.value = rand(-8, 8);
@@ -129,6 +129,141 @@ const audio = {
     this.amb = { g, nodes };
   }
 };
+
+
+// ================================================================
+// 曲（BGM）：その場で合成して演奏する。録音した音源は使わない
+// ================================================================
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const MINOR = [0, 2, 3, 5, 7, 8, 10], HARM = [0, 2, 3, 5, 7, 8, 11], MAJOR = [0, 2, 4, 5, 7, 9, 11];
+// 曲の設計図。chords は小節ごとの和音の根音（音階の何番目か）、mel は旋律（音階の番号・null は休み、8分音符単位）
+const SONGS = {
+  explore: { bpm: 74, scale: MINOR, chords: [0, 5, 2, 6, 0, 5, 3, 4],
+    mel: [[4, null, 3, 2, 3, null, null, null], [2, null, 1, 0, 1, null, null, null], [0, null, 2, 4, 5, null, 4, null], [3, null, null, null, null, null, null, null],
+          [4, null, 5, 4, 3, null, 2, null], [3, null, 2, 1, 2, null, null, null], [0, null, 1, 2, 3, null, 2, 1], [0, null, null, null, null, null, null, null]],
+    pluck: [0, 2, 3, 5, 6], bassSteps: [0, 4], bell: true, drums: false, pad: 0.05, lead: "pluck" },
+  battle: { bpm: 138, scale: HARM, chords: [0, 5, 6, 4, 0, 5, 3, 4],
+    mel: [[4, 4, null, 5, 4, null, 2, null], [3, null, 2, null, 0, null, null, null], [4, 4, null, 5, 7, null, 6, 5], [4, null, null, null, 6, null, 4, null],
+          [7, null, 6, 5, 4, null, 2, null], [3, null, 4, null, 5, null, 3, null], [2, null, 3, 4, 3, null, 2, 1], [4, null, null, null, null, null, null, null]],
+    pluck: [0, 1, 2, 3, 4, 5, 6, 7], bassSteps: [0, 1, 2, 3, 4, 5, 6, 7], bell: false, drums: true, pad: 0.035, lead: "brass" },
+  boss: { bpm: 112, scale: HARM, chords: [0, 0, 5, 4, 0, 1, 5, 4],
+    mel: [[0, null, null, 4, 3, null, 2, null], [1, null, null, null, 0, null, null, null], [5, null, 4, null, 3, null, 2, null], [4, null, null, null, null, null, null, null],
+          [7, null, null, 6, 5, null, 4, null], [5, null, 6, null, 7, null, 8, null], [9, null, 8, null, 7, null, 6, null], [7, null, null, null, null, null, null, null]],
+    pluck: [0, 2, 4, 6], bassSteps: [0, 1, 2, 3, 4, 5, 6, 7], bell: true, drums: true, choir: true, timpani: true, pad: 0.05, lead: "brass" },
+  abyss: { bpm: 54, scale: [0, 1, 4, 6, 7, 10], chords: [0, 3, 0, 2],
+    mel: [[3, null, null, null, 2, null, null, null], [null, null, null, null, null, null, null, null], [5, null, null, null, 4, null, 1, null], [null, null, null, null, null, null, null, null]],
+    pluck: [0, 4], bassSteps: [0], bell: true, drums: false, choir: true, pad: 0.06, lead: "bell" },
+  ending: { bpm: 66, scale: MAJOR, chords: [0, 4, 5, 3, 0, 4, 3, 4],
+    mel: [[2, null, 3, 4, 4, null, null, null], [4, null, 3, 2, 1, null, null, null], [0, null, 1, 2, 2, null, 1, null], [1, null, null, null, null, null, null, null],
+          [2, null, 3, 4, 7, null, 6, null], [5, null, 4, 3, 4, null, null, null], [3, null, 2, 1, 2, null, 1, null], [0, null, null, null, null, null, null, null]],
+    pluck: [0, 2, 4, 6], bassSteps: [0, 4], bell: true, drums: false, pad: 0.05, lead: "pluck" }
+};
+// 階ごとに調と速さを変える（同じ旋律でも雰囲気が変わる）
+const FLOOR_KEY = [{ root: 50, bpm: 74 }, { root: 52, bpm: 70 }, { root: 48, bpm: 64 }, { root: 53, bpm: 78 }, { root: 47, bpm: 84 }, { root: 45, bpm: 54 }];
+const music = {
+  on: (() => { try { return localStorage.getItem("sakambit_music") !== "off"; } catch { return true; } })(),
+  song: null, key: null, gain: null, step: 0, next: 0, timer: null,
+  play(name, floor = 0) {
+    if (!audio.ctx) return;
+    const k = `${name}:${name === "explore" ? floor : ""}`;
+    if (k === this.key) return;
+    this.key = k;
+    const ctx = audio.ctx;
+    if (this.gain) { const old = this.gain; old.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5); setTimeout(() => old.disconnect(), 3000); }
+    this.gain = ctx.createGain(); this.gain.gain.value = 0.0001;
+    this.gain.gain.setTargetAtTime(this.on ? 0.55 : 0.0001, ctx.currentTime + 0.05, name === "battle" || name === "boss" ? 0.15 : 0.9);
+    this.gain.connect(audio.master); if (audio.verb) { const w = ctx.createGain(); w.gain.value = 0.6; this.gain.connect(w); w.connect(audio.verb); }
+    const base = SONGS[name], fk = FLOOR_KEY[floor] || FLOOR_KEY[0];
+    this.song = { ...base, root: name === "explore" ? fk.root : name === "battle" ? 50 + (floor % 3) : name === "boss" ? 45 : name === "abyss" ? 41 : 50,
+      bpm: name === "explore" ? fk.bpm : base.bpm, name };
+    this.step = 0; this.next = ctx.currentTime + 0.1;
+    if (!this.timer) this.timer = setInterval(() => this.tick(), 25);
+  },
+  stop() { if (this.gain && audio.ctx) this.gain.gain.setTargetAtTime(0.0001, audio.ctx.currentTime, 0.4); this.key = null; this.song = null; },
+  toggle() {
+    this.on = !this.on; try { localStorage.setItem("sakambit_music", this.on ? "on" : "off"); } catch {}
+    if (this.gain && audio.ctx) this.gain.gain.setTargetAtTime(this.on ? 0.55 : 0.0001, audio.ctx.currentTime, 0.2);
+    return this.on;
+  },
+  note(deg, oct = 0) { const sc = this.song.scale, n = sc.length; const o = Math.floor(deg / n); return this.song.root + 12 * (oct + o) + sc[((deg % n) + n) % n]; },
+  tick() {
+    if (!this.song || !audio.ctx) return;
+    const ctx = audio.ctx, spb = 60 / this.song.bpm / 2;   // 8分音符の長さ
+    while (this.next < ctx.currentTime + 0.12) { this.playStep(this.step, this.next, spb); this.next += spb; this.step++; }
+  },
+  playStep(i, t, spb) {
+    const S = this.song, bars = S.chords.length, bar = Math.floor(i / 8) % bars, st = i % 8;
+    const chordDeg = S.chords[bar], tri = [chordDeg, chordDeg + 2, chordDeg + 4];
+    if (st === 0) {
+      // 和音の持続音（パッド）と、ボス・奈落では合唱
+      this.pad(t, tri.map(d => this.note(d, 0)), spb * 8, S.pad);
+      if (S.choir) this.choir(t, tri.map(d => this.note(d, 1)), spb * 8);
+      if (S.bell && bar % 2 === 0) this.bell(t + spb * 0.02, this.note(chordDeg + 4, 2), 0.05);
+      if (S.timpani) this.timpani(t, this.note(chordDeg, -1));
+    }
+    if (S.bassSteps.includes(st)) {
+      const oct = S.name === "battle" || S.name === "boss" ? (st % 2 ? 0 : -1) : -1;
+      this.bass(t, this.note(chordDeg, oct), spb * (S.bassSteps.length > 2 ? 0.9 : 3.5));
+    }
+    if (S.pluck.includes(st)) this.pluck(t, this.note(tri[st % 3], S.name === "battle" ? 1 : 1), spb * 1.6, S.name === "battle" ? 0.035 : 0.045);
+    const mel = S.mel[bar % S.mel.length][st];
+    if (mel != null) {
+      let len = 1; const row = S.mel[bar % S.mel.length]; while (st + len < 8 && row[st + len] === null) len++;
+      const m = this.note(mel, 2);
+      if (S.lead === "brass") this.brass(t, m, spb * len * 0.92); else if (S.lead === "bell") this.bell(t, m, 0.06); else this.lute(t, m, spb * len);
+    }
+    if (S.drums) {
+      if (st === 0 || st === 4 || (S.name === "battle" && st === 7)) this.kick(t);
+      if (st === 2 || st === 6) this.snare(t);
+      if (S.name === "battle") this.hat(t);
+    }
+  },
+  // ---- 楽器 ----
+  env(g, t, a, peak, dur, rel) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.setTargetAtTime(0.0001, t + dur, rel); },
+  osc(type, f, t, end, dest, detune = 0) { const o = audio.ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune; o.connect(dest); o.start(t); o.stop(end); return o; },
+  pad(t, notes, dur, vol) {
+    const ctx = audio.ctx, g = ctx.createGain(), f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900; f.Q.value = 0.6;
+    this.env(g, t, 0.8, vol, dur - 0.3, 0.6); f.connect(g); g.connect(this.gain);
+    for (const n of notes) for (const d of [-7, 7]) this.osc("sawtooth", mtof(n), t, t + dur + 3, f, d);
+  },
+  choir(t, notes, dur) {
+    const ctx = audio.ctx, g = ctx.createGain(); this.env(g, t, 1.2, 0.03, dur - 0.4, 0.8); g.connect(this.gain);
+    for (const fq of [700, 1150]) { const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = fq; bp.Q.value = 6; bp.connect(g);
+      for (const n of notes) this.osc("sawtooth", mtof(n), t, t + dur + 3, bp, rand(-10, 10)); }
+  },
+  bass(t, m, dur) { const g = audio.ctx.createGain(); this.env(g, t, 0.01, 0.16, dur * 0.7, 0.12); g.connect(this.gain); this.osc("triangle", mtof(m), t, t + dur + 1, g); this.osc("sine", mtof(m - 12), t, t + dur + 1, g); },
+  pluck(t, m, dur, vol) { const g = audio.ctx.createGain(); this.env(g, t, 0.004, vol, 0.02, dur * 0.35); g.connect(this.gain); this.osc("triangle", mtof(m), t, t + dur + 1, g); },
+  lute(t, m, dur) {
+    const ctx = audio.ctx, g = ctx.createGain(), f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(700, t + dur);
+    this.env(g, t, 0.006, 0.09, 0.03, Math.max(0.25, dur * 0.45)); f.connect(g); g.connect(this.gain);
+    this.osc("sawtooth", mtof(m), t, t + dur + 2, f); this.osc("triangle", mtof(m + 12), t, t + dur + 2, f, 4);
+  },
+  brass(t, m, dur) {
+    const ctx = audio.ctx, g = ctx.createGain(), f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(600, t); f.frequency.linearRampToValueAtTime(2200, t + 0.08); f.Q.value = 2;
+    this.env(g, t, 0.03, 0.075, dur, 0.08); f.connect(g); g.connect(this.gain);
+    this.osc("sawtooth", mtof(m), t, t + dur + 1, f, -5); this.osc("sawtooth", mtof(m), t, t + dur + 1, f, 5);
+  },
+  bell(t, m, vol) { const g = audio.ctx.createGain(); this.env(g, t, 0.003, vol, 0.01, 1.4); g.connect(this.gain); this.osc("sine", mtof(m), t, t + 5, g); this.osc("sine", mtof(m) * 2.76, t, t + 3, g); },
+  timpani(t, m) { const g = audio.ctx.createGain(); this.env(g, t, 0.005, 0.25, 0.05, 0.5); g.connect(this.gain); const o = this.osc("sine", mtof(m), t, t + 2, g); o.frequency.exponentialRampToValueAtTime(mtof(m) * 0.92, t + 0.6); },
+  kick(t) { const g = audio.ctx.createGain(); this.env(g, t, 0.002, 0.3, 0.02, 0.12); g.connect(this.gain); const o = this.osc("sine", 110, t, t + 0.5, g); o.frequency.exponentialRampToValueAtTime(42, t + 0.18); },
+  snare(t) {
+    const ctx = audio.ctx, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s2.buffer = audio.noiseBuf; f.type = "bandpass"; f.frequency.value = 1700; this.env(g, t, 0.002, 0.11, 0.01, 0.07);
+    s2.connect(f); f.connect(g); g.connect(this.gain); s2.start(t, Math.random() * 0.5); s2.stop(t + 0.3);
+  },
+  hat(t) {
+    const ctx = audio.ctx, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s2.buffer = audio.noiseBuf; f.type = "highpass"; f.frequency.value = 7000; this.env(g, t, 0.001, 0.025, 0.005, 0.02);
+    s2.connect(f); f.connect(g); g.connect(this.gain); s2.start(t, Math.random() * 0.5); s2.stop(t + 0.1);
+  }
+};
+// 場面に合った曲を流す
+function bgm() {
+  if (!state || mode === "title") return music.play("explore", 0);
+  if (mode === "ending") return music.play("ending");
+  if (mode === "battle" && battle) return music.play(battle.boss ? (battle.id === "abyss_king" ? "abyss" : "boss") : "battle", state.floor);
+  return music.play(state.floor === 5 ? "abyss" : "explore", state.floor);
+}
 
 // ================================================================
 // 描画の土台
@@ -755,7 +890,7 @@ function changeFloor(to, fall = false) {
     state.danger = Math.max(0, state.danger - 20);
     state.stats.maxFloor = Math.max(state.stats.maxFloor, to);
     if (to === 5) state.stats.abyss = true;
-    buildFloor(to); placeCamera(); reveal(); renderHud(); audio.ambient(to);
+    buildFloor(to); placeCamera(); reveal(); renderHud(); audio.ambient(to); bgm();
     const key = `intro${to}`;
     if (Fl.intro && !state.flags[key]) { state.flags[key] = true; say(Fl.intro); } else say(`${Fl.name}へ進んだ。`);
     checkAch();
@@ -864,6 +999,7 @@ function startBattle(forced = null, opts = {}) {
   else if (id === "golden_ghost") { audio.coin(); audio.encounter(); flash("rgba(255,215,90,.6)", 700); }
   else audio.encounter();
   spawnFoes();
+  bgm();
   $("battleTitle").textContent = boss ? m.name : `${arena ? arena.name + "　" : ""}${m.name}　${count}体`;
   $("battleTitle").classList.remove("hidden");
   say(id === "abyss_king" ? ABYSS_INTRO : forced === "boss" ? BOSS_INTRO
@@ -1200,7 +1336,7 @@ async function victory() {
     if (state.cycle >= 1) gainRare(rollRare(4, state.cycle, luck, 3));
     checkAch();
     await sleep(1600);
-    endBattle(); mode = "ending";
+    endBattle(); mode = "ending"; bgm();
     const sig = Object.keys(state.sigils).length;
     modal(`${ENDING_HTML}<p class="dim">${state.cycle + 1}周目の攻略。やりこみ度 ${completion()}%${sig < 4 ? `　（秘印 ${sig}/4 ── この城には、まだ底がある）` : ""}</p>
       <div class="acts"><button data-a="nextCycle">次の周回へ（強さを引き継ぐ）</button><button data-a="stay">この周回に残る</button><button data-a="toTitle">表題へ</button></div>`);
@@ -1304,7 +1440,7 @@ function endBattle() {
   hideCommands(); $("battleTitle").classList.add("hidden"); $("touch").classList.remove("hidden");
   state.party.forEach(p => p.guard = 0);
   if (mode === "battle") mode = "explore";
-  renderHud();
+  renderHud(); bgm();
 }
 function gameOver() {
   if (battle?.arena != null) {
@@ -1373,6 +1509,7 @@ function campMenu(note = "") {
       <button data-a="rareList">秘宝目録</button>
       <button data-a="achList">称号</button>
       <button data-a="save">記録する</button>
+      <button data-a="music">曲：${music.on ? "入" : "切"}</button>
       <button data-a="close">閉じる</button>
     </div>`);
 }
@@ -1519,6 +1656,7 @@ function action(a, v) {
       say(`${ally.name}が隊列に加わった。${out.name}は入口の酒場で待つことになった。`); audio.levelup(); renderHud(); break;
     }
     case "nextCycle": nextCycle(); break;
+    case "music": music.toggle(); mode = "explore"; campMenu(music.on ? "曲を流す。" : "曲を止めた。（効果音は鳴る）"); break;
     case "stay": closeModal(); mode = "explore"; say("城の闇は、まだ深い。"); renderHud(); break;
     case "swapRow": { const p = state.party.splice(0, 1)[0]; state.party.splice(3, 0, p); renderHud(); campOrTown(`${p.name}が後列へ下がった。`); break; }
     case "town": town(); break;
@@ -1589,7 +1727,7 @@ function startNew() { state = newState(); enterGame(PROLOGUE); }
 function enterGame(text) {
   $("title").classList.add("hidden");
   dark = 0; noSpell = 0; battle = null; busy = false; mode = "explore";
-  buildFloor(state.floor); placeCamera(); reveal(); renderHud(); audio.ambient(state.floor);
+  buildFloor(state.floor); placeCamera(); reveal(); renderHud(); audio.ambient(state.floor); bgm();
   say(text);
   $("fade").style.opacity = 0;
 }
@@ -1605,6 +1743,7 @@ function titleInfo() {
   if (sv && sv.party) { const keep = state; state = fillState(sv); el.innerHTML = `記録：${F().name}　${state.cycle + 1}周目　やりこみ度 ${completion()}%　　<a href="./" style="color:var(--gold)">通常版へ</a>`; state = keep; }
 }
 $("btnNew").addEventListener("click", () => { audio.init(); startNew(); });
+document.addEventListener("pointerdown", () => { if (!audio.ctx) { audio.init(); bgm(); } }, { once: true });
 $("btnLoad").addEventListener("click", () => { audio.init(); if (!loadGame()) { $("btnLoad").textContent = "記録がない"; setTimeout(() => $("btnLoad").textContent = "続きから", 1500); } });
 
 // ================================================================
@@ -1612,6 +1751,7 @@ $("btnLoad").addEventListener("click", () => { audio.init(); if (!loadGame()) { 
 // ================================================================
 function act(c) {
   audio.init();
+  if (c === "music") { const on = music.toggle(); say(on ? "曲を流す。（B で切り替え）" : "曲を止めた。（B で切り替え）", true); bgm(); return; }
   if (mode === "battle") {
     if (busy) return;
     const el = activeMenuEl();
@@ -1638,7 +1778,7 @@ addEventListener("keydown", e => {
     KeyW: "forward", ArrowUp: inBattle ? "up" : "forward", ArrowDown: inBattle ? "down" : "turn", KeyS: inBattle ? "down" : null,
     KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyX: "turn",
     KeyZ: "attack", Enter: "ok", Space: "ok", Numpad1: "ok", Escape: "cancel", Numpad2: "cancel", KeyC: "camp", KeyM: "map",
-    Digit1: "n1", Digit2: "n2", Digit3: "n3", Digit4: "n4"
+    Digit1: "n1", Digit2: "n2", Digit3: "n3", Digit4: "n4", KeyB: "music"
   };
   const c = map[e.code]; if (c) { e.preventDefault(); act(c); }
 });
