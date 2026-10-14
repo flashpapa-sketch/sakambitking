@@ -6,8 +6,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js";
-import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261014c";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261014c";
 
 // 立体版の追加要素を通常版のデータに合流させる
 Object.assign(EQUIPMENT, RARES);
