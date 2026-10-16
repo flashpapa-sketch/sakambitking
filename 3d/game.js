@@ -6,8 +6,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261014c";
-import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261014c";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016a";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016a";
 
 // 立体版の追加要素を通常版のデータに合流させる
 Object.assign(EQUIPMENT, RARES);
@@ -160,18 +160,51 @@ const SONGS = {
 };
 // 階ごとに調と速さを変える（同じ旋律でも雰囲気が変わる）
 const FLOOR_KEY = [{ root: 50, bpm: 74 }, { root: 52, bpm: 70 }, { root: 48, bpm: 64 }, { root: 53, bpm: 78 }, { root: 47, bpm: 84 }, { root: 45, bpm: 54 }];
+// 場面と曲の対応（探索は表題の曲を使う。探索用の曲ができたら explore を足す）
+const BGM_VER = "20261016a";
+const BGM_FILE = { title: "title", explore: "title", battle: "battle", boss: "boss", abyss: "abyss", town: "town", ending: "ending" };
 const music = {
   on: (() => { try { return localStorage.getItem("sakambit_music") !== "off"; } catch { return true; } })(),
   song: null, key: null, gain: null, step: 0, next: 0, timer: null,
+  // 録音した曲（3d/bgm）。読み込めた曲から順に差し替え、まだの曲や読み込めない時は合成の曲で鳴らす
+  vol: 0.55, fileVol: 0.85, files: {}, loading: false, src: null, want: null,
+  loadFiles() {
+    if (this.loading || !audio.ctx || TEST) return; this.loading = true;
+    const order = ["title", "battle", "town", "boss", "abyss", "ending"];
+    order.reduce((p, n) => p.then(() => fetch(`3d/bgm/${n}.mp3?v=${BGM_VER}`)
+      .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+      .then(b => audio.ctx.decodeAudioData(b))
+      .then(buf => { this.files[n] = buf; const w = this.want; if (w && BGM_FILE[w.name] === n) { this.key = null; this.play(w.name, w.floor); } })
+      .catch(() => {})), Promise.resolve());
+  },
+  fadeOld(ctx, fast) {
+    const t = fast ? 0.15 : 0.6;
+    if (this.gain) { const old = this.gain; old.gain.setTargetAtTime(0.0001, ctx.currentTime, t); setTimeout(() => old.disconnect(), 3000); }
+    if (this.src) { const s = this.src; try { s.stop(ctx.currentTime + t * 6); } catch {} this.src = null; }
+  },
   play(name, floor = 0) {
     if (!audio.ctx) return;
+    this.want = { name, floor }; this.loadFiles();
+    const ctx = audio.ctx, fast = name === "battle" || name === "boss";
+    const fname = BGM_FILE[name], buf = this.files[fname];
+    if (buf) {
+      const k = `曲:${fname}`;
+      if (k === this.key) return;
+      this.key = k; this.fadeOld(ctx, fast); this.song = null;
+      this.gain = ctx.createGain(); this.gain.gain.value = 0.0001;
+      this.gain.gain.setTargetAtTime(this.on ? this.fileVol : 0.0001, ctx.currentTime + 0.05, fast ? 0.12 : 0.7);
+      this.gain.connect(audio.master);
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = name !== "ending";
+      src.connect(this.gain); src.start(ctx.currentTime + 0.02); this.src = src;
+      return;
+    }
+    if (!SONGS[name]) name = "explore";
     const k = `${name}:${name === "explore" ? floor : ""}`;
     if (k === this.key) return;
     this.key = k;
-    const ctx = audio.ctx;
-    if (this.gain) { const old = this.gain; old.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5); setTimeout(() => old.disconnect(), 3000); }
+    this.fadeOld(ctx, fast);
     this.gain = ctx.createGain(); this.gain.gain.value = 0.0001;
-    this.gain.gain.setTargetAtTime(this.on ? 0.55 : 0.0001, ctx.currentTime + 0.05, name === "battle" || name === "boss" ? 0.15 : 0.9);
+    this.gain.gain.setTargetAtTime(this.on ? this.vol : 0.0001, ctx.currentTime + 0.05, fast ? 0.15 : 0.9);
     this.gain.connect(audio.master); if (audio.verb) { const w = ctx.createGain(); w.gain.value = 0.6; this.gain.connect(w); w.connect(audio.verb); }
     const base = SONGS[name], fk = FLOOR_KEY[floor] || FLOOR_KEY[0];
     this.song = { ...base, root: name === "explore" ? fk.root : name === "battle" ? 50 + (floor % 3) : name === "boss" ? 45 : name === "abyss" ? 41 : 50,
@@ -179,10 +212,10 @@ const music = {
     this.step = 0; this.next = ctx.currentTime + 0.1;
     if (!this.timer) this.timer = setInterval(() => this.tick(), 25);
   },
-  stop() { if (this.gain && audio.ctx) this.gain.gain.setTargetAtTime(0.0001, audio.ctx.currentTime, 0.4); this.key = null; this.song = null; },
+  stop() { if (audio.ctx) this.fadeOld(audio.ctx, false); this.gain = null; this.key = null; this.song = null; },
   toggle() {
     this.on = !this.on; try { localStorage.setItem("sakambit_music", this.on ? "on" : "off"); } catch {}
-    if (this.gain && audio.ctx) this.gain.gain.setTargetAtTime(this.on ? 0.55 : 0.0001, audio.ctx.currentTime, 0.2);
+    if (this.gain && audio.ctx) this.gain.gain.setTargetAtTime(this.on ? (this.src ? this.fileVol : this.vol) : 0.0001, audio.ctx.currentTime, 0.2);
     return this.on;
   },
   note(deg, oct = 0) { const sc = this.song.scale, n = sc.length; const o = Math.floor(deg / n); return this.song.root + 12 * (oct + o) + sc[((deg % n) + n) % n]; },
@@ -258,10 +291,12 @@ const music = {
   }
 };
 // 場面に合った曲を流す
+let townBgm = false;
 function bgm() {
-  if (!state || mode === "title") return music.play("explore", 0);
+  if (!state || mode === "title") return music.play("title", 0);
   if (mode === "ending") return music.play("ending");
   if (mode === "battle" && battle) return music.play(battle.boss ? (battle.id === "abyss_king" ? "abyss" : "boss") : "battle", state.floor);
+  if (townBgm && mode === "modal") return music.play("town", state.floor);
   return music.play(state.floor === 5 ? "abyss" : "explore", state.floor);
 }
 
@@ -1514,7 +1549,7 @@ function campMenu(note = "") {
     </div>`);
 }
 function town(note = "") {
-  mode = "modal"; state.danger = 0;
+  mode = "modal"; state.danger = 0; townBgm = true; bgm();
   const innCost = 30 + state.party.reduce((s2, p) => s2 + p.lv * 8, 0);
   const shop = Object.entries(ITEMS).map(([id, it]) => `<button data-a="buyItem" data-v="${id}">${it.name}　${it.price}</button>`).join("");
   const arms = Object.entries(EQUIPMENT).filter(([id, e]) => !e.cursed && !e.tier && id !== "muramasaShard").map(([id, e]) => `<button data-a="buyEquip" data-v="${id}">${e.name}　${e.price}</button>`).join("");
@@ -1611,7 +1646,7 @@ function nextCycle() {
 function action(a, v) {
   if (a.startsWith("c") && chest && ["cInspect", "cDisarm", "cOpen", "cLeave"].includes(a)) return chestAction(a);
   switch (a) {
-    case "close": closeModal(); mode = "explore"; renderHud(); break;
+    case "close": closeModal(); mode = "explore"; townBgm = false; bgm(); renderHud(); break;
     case "newGame": closeModal(); startNew(); break;
     case "toTitle": closeModal(); showTitle(); break;
     case "load": closeModal(); if (!loadGame()) { showTitle(); } break;
@@ -1733,8 +1768,8 @@ function enterGame(text) {
 }
 function showTitle() {
   mode = "title"; endBattle(); mode = "title";
-  titleInfo();
-  $("title").classList.remove("hidden");
+  townBgm = false; titleInfo();
+  $("title").classList.remove("hidden"); bgm();
 }
 $("title").style.backgroundImage = "url(img/title.png)";
 function titleInfo() {
