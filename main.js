@@ -620,7 +620,7 @@ function tickStatuses() {
   if (log.length) message = log.join("\n");
 }
 
-function handleEvent() {
+function handleEvent(byInspect = false) {
   const ev = currentEvent();
   if (!ev) {
     if (!message) message = "暗い通路が続く。";
@@ -667,6 +667,8 @@ function handleEvent() {
     sfx.curse();
   }
   if (ev.type === "stairs") {
+    // 階段は通り抜けられる。上り下りは「調べる」で決める
+    if (!byInspect) { message = `${ev.to > state.floor ? "下り" : "上り"}階段がある。（Z・Enter で${ev.to > state.floor ? "下りる" : "上る"}）`; return; }
     changeFloor(ev.to);
     return;
   }
@@ -719,7 +721,7 @@ function changeFloor(to) {
 function inspect() {
   if (mode !== "explore") return;
   message = "";
-  handleEvent();
+  handleEvent(true);
   if (!message) {
     const d = DIRS[state.dir];
     message = tileAt(state.x + d.dx, state.y + d.dy) === "#" ? "前方は壁。叩いても空洞音はない。" : "通路の奥から湿った風が来る。";
@@ -1250,7 +1252,9 @@ function town(extra = "") {
 function rest() {
   const cost = 30 + state.party.reduce((s, p) => s + p.lv * 8, 0);
   if (state.gold < cost) {
-    message = `宿代は${cost}ゴールド。足りない。`;
+    // 金が足りなくても、馬小屋の藁の上で眠ることはできる（体力だけ戻る）
+    state.party.forEach(p => { if (p.hp > 0) { p.hp = p.maxHp; delete p.status.sleep; } });
+    message = `宿代は${cost}ゴールド。足りないので、馬小屋の藁の上でただ眠った。\n体力は戻ったが、呪文の回数は戻らない。`;
     return render();
   }
   state.gold -= cost;
@@ -1465,11 +1469,18 @@ function showMap() {
 }
 
 function showHelp() {
+  const row = (k, d) => `<tr><td style="color:var(--gold);padding:1px 14px 1px 0;white-space:nowrap;width:15em">${k}</td><td>${d}</td></tr>`;
   showModal(`
-    <h2>第三版の遊び方</h2>
-    <p>ファミコン版ウィザードリィを意識し、6人隊列、防御値、呪文回数、宝箱罠、寺院、宿屋、商店、地図、隊列変更を入れています。</p>
-    <p>前列3人は通常攻撃が届きます。後列は魔法と祈りが主役です。盗賊が生きていると罠判定と遭遇率が楽になります。</p>
-    <p>宝箱は「調査」「罠解除」「開ける」の順が基本。無理に開けると毒針や爆裂罠が来ます。</p>
+    <h2>操作一覧</h2>
+    <p style="margin:8px 0 2px">迷宮を歩く</p><table>
+    ${row("W ／ ↑", "前へ進む")}${row("↓", "一歩下がる")}${row("A ／ ←", "左を向く")}${row("D ／ →", "右を向く")}${row("X", "振り返る")}
+    ${row("Z ／ Enter ／ Space ／ テンキー1", "調べる（階段・宝箱・仕掛け）")}${row("Esc ／ テンキー2", "野営（宿屋・寺院・商店・装備・保存）")}${row("H", "この操作一覧")}</table>
+    <p style="margin:8px 0 2px">戦う</p><table>
+    ${row("Z ／ Enter ／ Space ／ テンキー1", "攻撃")}${row("X ／ Esc ／ テンキー2", "防御")}${row("画面のボタン", "魔術・祈り・退却・薬・香")}</table>
+    <p style="margin:8px 0 2px">宝箱</p><table>
+    ${row("Z ／ Enter ／ テンキー1", "開ける")}${row("X ／ Esc ／ テンキー2", "そのまま立ち去る")}${row("画面のボタン", "罠調査・罠解除")}</table>
+    <p style="margin:8px 0 2px">窓</p><table>${row("Esc", "閉じる")}</table>
+    <p>宝箱は「罠調査」→「罠解除」→「開ける」の順が基本です。前列の3人だけが武器で攻撃できます。</p>
     <div class="actions"><button data-action="close">戻る</button></div>
   `);
 }
@@ -1482,7 +1493,7 @@ function showTitle() {
     <div class="actions">
       <button data-action="new">新しく始める</button>
       <button data-action="load">続きから</button>
-      <button data-action="help">説明</button>
+      <button data-action="help">操作一覧</button>
       <a href="3d.html" style="color:#d9b65f;align-self:center;margin-left:8px">立体版で遊ぶ</a>
     </div>
   `, true);
@@ -2854,6 +2865,7 @@ window.addEventListener("keydown", e => {
   // W=前進 / A=左を向く / D=右を向く / X=後ろを向く（その場で反転）
   const wasd = { KeyW: "forward", KeyA: "left", KeyD: "right", KeyX: "turnback" };
   if (mode === "explore" && wasd[e.code] && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); command(wasd[e.code]); return; }
+  if (e.code === "KeyH" && !overlayEl.classList.contains("show")) { e.preventDefault(); showHelp(); return; }
   const isA = e.key === "z" || e.key === "Z" || e.key === "Enter" || e.key === " ";
   const isB = e.key === "x" || e.key === "X" || e.key === "Escape";
   if (!isA && !isB) return;

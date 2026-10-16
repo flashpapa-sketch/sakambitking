@@ -6,8 +6,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016c";
-import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016c";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016d";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016d";
 
 // 立体版の追加要素を通常版のデータに合流させる
 Object.assign(EQUIPMENT, RARES);
@@ -163,7 +163,7 @@ const SONGS = {
 // 階ごとに調と速さを変える（同じ旋律でも雰囲気が変わる）
 const FLOOR_KEY = [{ root: 50, bpm: 74 }, { root: 52, bpm: 70 }, { root: 48, bpm: 64 }, { root: 53, bpm: 78 }, { root: 47, bpm: 84 }, { root: 45, bpm: 54 }];
 // 場面と曲の対応
-const BGM_VER = "20261016c";
+const BGM_VER = "20261016d";
 const BGM_FILE = { title: "title", explore: "explore", battle: "battle", boss: "boss", abyss: "abyss", town: "town", ending: "ending" };
 const music = {
   on: (() => { try { return localStorage.getItem("sakambit_music") !== "off"; } catch { return true; } })(),
@@ -1622,12 +1622,14 @@ function tavernView(note = "") {
     state.party.map((q, i) => i === 0 && !q.dead ? "" : `<button data-a="tavSwap" data-v="${ri}|${i}">${q.name}と交代</button>`).join(" ") + `</div>`).join("");
   const hire = Object.entries(CLASSES).map(([id, c]) => `<button data-a="hire" data-v="${id}">${c.label}</button>`).join("");
   sub(`<h2>酒場</h2>${note ? `<p class="gold" style="white-space:pre-line">${note}</p>` : ""}<p class="dim">隊列を離れた仲間がここで待っている。</p>${res || '<p class="dim">待っている者はいない。</p>'}
-    <p class="dim">新しい冒険者を雇う（${HIRE_COST}ゴールド・レベル1）。消失した仲間がいれば、その場所に入る。</p><div class="acts">${hire}</div>
+    <p class="dim">新しい冒険者を雇う（${HIRE_COST}ゴールド・レベル1）。消失した仲間がいれば、その場所に入る。${state.gold < HIRE_COST && state.party.filter(p => !p.dead && p.hp > 0).length <= 2 ? '<br><span class="gold">今なら主人が無償で紹介してくれる。</span>' : ""}</p><div class="acts">${hire}</div>
     <div class="acts"><button data-a="back">戻る</button></div>`, "town");
 }
 function hire(cls) {
-  if (state.gold < HIRE_COST) return tavernView("金が足りない。");
-  state.gold -= HIRE_COST;
+  // 動ける者が二人以下で金もない時は、酒場の主人が駆け出しを無償で紹介してくれる
+  const charity = state.gold < HIRE_COST && state.party.filter(p => !p.dead && p.hp > 0).length <= 2;
+  if (state.gold < HIRE_COST && !charity) return tavernView("金が足りない。");
+  if (!charity) state.gold -= HIRE_COST;
   const used = new Set([...state.party, ...state.reserve].map(p => p.name));
   const name = HIRE_NAMES.find(n => !used.has(n)) || `${CLASSES[cls].label}${rand(2, 99)}`;
   const m = makeMember({ id: `hire_${Date.now()}`, name, cls, align: choose(["善", "中", "悪"]) });
@@ -1699,7 +1701,11 @@ function action(a, v) {
     case "town": town(); break;
     case "inn": {
       const cost = 30 + state.party.reduce((s, p) => s + p.lv * 8, 0);
-      if (state.gold < cost) { town(`宿代は${cost}ゴールド。足りない。`); break; }
+      if (state.gold < cost) {
+        // 金が足りなくても、馬小屋の藁の上で眠ることはできる（体力だけ戻る）
+        state.danger = 0; state.party.forEach(p => { if (p.hp > 0 && !p.dead) { p.hp = p.maxHp; delete p.status.poison; } });
+        audio.heal(); renderHud(); town(`宿代は${cost}ゴールド。足りないので、馬小屋の藁の上でただ眠った。\n体力は戻ったが、呪文の回数は戻らない。`); break;
+      }
       state.gold -= cost; state.danger = 0; state.party.forEach(p => { if (p.hp > 0 && !p.dead) { p.hp = p.maxHp; p.mp = [...p.maxMp]; p.status = {}; } });
       audio.heal(); renderHud(); town(`馬小屋で休んだ。${cost}ゴールド支払った。`); break;
     }
@@ -1806,6 +1812,23 @@ function act(c) {
   if (c === "ok" || c === "attack") { const t = handleEvent(true); renderHud(); return t; }
   if (c === "camp" || c === "cancel") return campMenu();
   if (c === "map") return toggleMap();
+  if (c === "help") return keyHelp();
+}
+
+// 操作一覧（H キー）
+function keyHelp() {
+  mode = "modal";
+  const row = (k, d) => `<tr><td class="gold" style="padding:3px 14px 3px 0;white-space:nowrap">${k}</td><td>${d}</td></tr>`;
+  modal(`<h2>操作一覧</h2>
+    <p class="dim" style="margin-top:0">迷宮を歩く</p><table>
+    ${row("W ／ ↑", "前へ進む")}${row("A ／ ←", "左を向く")}${row("D ／ →", "右を向く")}${row("X ／ ↓", "振り返る")}
+    ${row("Z ／ Enter ／ Space ／ テンキー1", "調べる・決定・階段を上り下りする")}
+    ${row("C ／ Esc ／ テンキー2", "野営（装備・道具・図鑑・記録など）")}${row("M", "地図を広げる・閉じる")}${row("B", "曲を流す・止める")}${row("H", "この操作一覧")}</table>
+    <p class="dim">戦う</p><table>
+    ${row("Z", "攻撃")}${row("1 ／ 2 ／ 3 ／ 4", "呪文 ／ 祈り ／ 防御 ／ 道具")}${row("↑ ↓ ／ S", "項目を選ぶ")}${row("Enter ／ Space ／ テンキー1", "選んだ項目に決める")}
+    ${row("Esc ／ テンキー2", "一つ戻る・退く（ボス戦では退けない）")}</table>
+    <p class="dim">窓（町・野営・宝箱など）</p><table>${row("マウス・指", "ボタンを押す")}${row("Esc ／ テンキー2", "閉じる")}</table>
+    <div class="acts"><button data-a="close">閉じる</button></div>`);
 }
 addEventListener("keydown", e => {
   if (mode === "title") { if (e.code === "Enter" || e.code === "Space" || e.code === "KeyZ") { audio.init(); startNew(); } return; }
@@ -1815,7 +1838,7 @@ addEventListener("keydown", e => {
     KeyW: "forward", ArrowUp: inBattle ? "up" : "forward", ArrowDown: inBattle ? "down" : "turn", KeyS: inBattle ? "down" : null,
     KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", KeyX: "turn",
     KeyZ: "attack", Enter: "ok", Space: "ok", Numpad1: "ok", Escape: "cancel", Numpad2: "cancel", KeyC: "camp", KeyM: "map",
-    Digit1: "n1", Digit2: "n2", Digit3: "n3", Digit4: "n4", KeyB: "music"
+    Digit1: "n1", Digit2: "n2", Digit3: "n3", Digit4: "n4", KeyB: "music", KeyH: "help"
   };
   const c = map[e.code]; if (c) { e.preventDefault(); act(c); }
 });
