@@ -1,0 +1,164 @@
+サカムビット公の逆襲　怪物の絵の依頼文（全7枚・112体）
+使い方：1枚ずつ Gemini に貼って画像を作り、できた画像を「サカムビット公\怪物の絵」に sheet1.png ～ sheet7.png の名前で保存してください。
+うまくいかない枚（数が16体でない・枠がずれる等）は、同じ文をもう一度貼って作り直してください。
+
+==================== sheet1.png　人型とならず者 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. スケルトン — 古びた骸骨の戦士、欠けた剣と割れた丸盾、眼窩に青白い光
+2. 盗賊崩れ — 落ちぶれた元兵士、破れた鎖帷子、無精ひげ、刃こぼれした長剣
+3. ゴブリン — 緑の肌の小鬼、尖った耳、黄色い目、錆びた短剣と腰布
+4. ゾンビ — 腐りかけた村人の死体、灰緑の肌、破れた服、両腕を前に伸ばす
+5. 小悪魔 — 赤黒い小さな悪魔、こうもりの翼、細い尻尾、意地悪な笑み
+6. 山賊 — 覆面の山賊、毛皮の肩当て、片手斧、腰に盗品の袋
+7. ごろつき — 痩せた荒くれ男、ぼろ布の頭巾、錆びた短剣、片目に眼帯
+8. 虚無の亡者 — 顔のない灰色の人影、ぽっかり空いた胸の穴、ぼろ衣
+9. 茸人 — 人の背丈ほどの毒茸の怪物、赤い傘に白い斑点、胞子を散らす
+10. 骨の犬 — 骨だけになった大型犬、赤く光る眼窩、むき出しの牙
+11. ガーゴイル — 石の悪魔像、ひび割れた灰色の翼、鉤爪、しゃがんだ姿勢
+12. 真鍮の騎士 — 真鍮の全身鎧、緑青の染み、大盾と槍、兜の隙間に光
+13. 牢番 — 太った牢番、鍵束、棘付き棍棒、革の前掛け
+14. 牢獄番長 — 大柄な牢獄の長、鉄仮面、鎖を巻いた腕、大きな鍵と鞭
+15. ミノタウロス — 牛頭の巨人、筋骨隆々、両刃の大斧、鼻輪
+16. 鉄爪 — 両手に鉄の鉤爪を付けた獣人の殺し屋、黒い革鎧
+
+==================== sheet2.png　獣・虫・小さな怪物 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 洞窟蝙蝠 — 大きな茶色の蝙蝠、広げた翼、赤い目、鋭い牙
+2. 粘液体 — 半透明の緑の粘液の塊、中に骨や硬貨が浮かぶ
+3. 洞窟蜘蛛 — 犬ほどの黒い大蜘蛛、毛深い脚、八つの赤い目、毒の牙
+4. 毒ガマ — 紫と黄の斑の巨大なガマ蛙、いぼだらけ、毒液が垂れる
+5. 泥蝙蝠 — 泥にまみれた灰色の蝙蝠、垂れる泥、濁った目
+6. 洞窟蟲 — 地面から伸び上がる太い白い蟲、円形の口に輪状の牙
+7. 毒粉モス — 大きな灰色の蛾、羽から黄色い毒粉が舞う
+8. 石蛇 — 灰色の石の鱗を持つ大蛇、鎌首をもたげる、琥珀色の目
+9. 青銅甲虫 — 青銅色に光る大きな甲虫、金属の殻、鋭い角
+10. 水晶蝶 — 水晶の羽を持つ透き通った蝶、淡い青紫の光
+11. 猛毒蛾 — 黒と毒々しい緑の大蛾、羽に髑髏模様
+12. 洞窟蛭 — 人の腕ほどの赤黒い蛭、吸盤の口、ぬめり
+13. 岩蟹 — 背中が岩でできた巨大な蟹、大きな鋏
+14. 黴の這うもの — 黴と苔に覆われて這う人型、緑白の胞子
+15. 蜂の群れ — 黄色と黒の大きな蜂の群れ、一つの塊のように見える
+16. 闇蝙蝠 — 黒紫の影でできた蝙蝠、白く光る目、煙のような翼
+
+==================== sheet3.png　精霊・ゴーレム・亡霊 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 錆精霊 — 錆色の小さな精霊、鉄くずの体、オレンジの火花
+2. ウィスプ — 青白く揺らめく火の玉、中に小さな顔
+3. 泥ゴーレム — 泥と石でできた巨人、ずんぐりした体、目は二つの穴
+4. 炎の精 — 燃え上がる炎の人型、オレンジと赤、腕から火の粉
+5. 氷の精 — 氷の結晶でできた小さな精霊、水色、冷気をまとう
+6. 呪眼 — 宙に浮く巨大な一つ目、紫の血管、呪いの紋様
+7. 琥珀ゴーレム — 琥珀色の半透明な体のゴーレム、中に虫が閉じ込められている
+8. 砂の怨念 — 砂でできた幽霊、崩れ続ける体、空洞の目
+9. 砂塵の悪魔 — 渦巻く砂嵐の中に浮かぶ悪魔の顔
+10. 毒の粘液 — 泡立つ紫緑の毒の粘液、溶けかけた鎧の破片
+11. 壺の亡霊 — 古い壺から上半身を出す亡霊、長い腕
+12. 混沌の精 — 色が絶えず変わる歪んだ小精霊、ねじれた角
+13. 溶岩蛞蝓 — 溶岩をまとった巨大な蛞蝓、赤熱した背中
+14. 影の追跡者 — 黒い影の人型、細長い手足、白い目だけが光る
+15. 鎖の亡霊 — 鎖に縛られた半透明の亡霊、苦悶の表情、垂れる鎖
+16. 霧の老婆 — 霧をまとう腰の曲がった老婆の魔女、長い爪、白濁した目
+
+==================== sheet4.png　闇の住人 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 暗黒騎士 — 黒い全身鎧の騎士、赤いマント、黒い大剣
+2. 骨の魔道士 — ローブを着た骸骨の魔法使い、杖の先に紫の炎
+3. 疫病博士 — 鳥の嘴の仮面、黒い外套、薬瓶と杖
+4. 眼球獣 — 全身に目がある肉塊の獣、多数の触手
+5. 腐敗歩き — 腐って膨れた巨体の死人、緑の瘴気、蝿がたかる
+6. 血染め蛾 — 深紅の羽の大蛾、羽から血の雫が落ちる
+7. 墓場蝙蝠 — 骨の混じった灰色の大蝙蝠、墓石の苔
+8. 廃墟の番人 — 崩れた石像の番人、ひびから光が漏れる、石の槍
+9. 呪いの手 — 宙に浮く巨大な灰色の手、掌に目、指に呪いの指輪
+10. 洞窟の恐怖 — 洞窟の闇に潜む多脚の怪物、大きな口と無数の牙
+11. バンシー — 白い髪を振り乱す女の亡霊、大きく開いた口、ぼろの白衣
+12. リッチ — 王冠を戴く骸骨の大魔法使い、豪華な黒いローブ、宝玉の杖
+13. ミミック — 牙と舌のある宝箱の怪物、蓋の中に目
+14. 吸血鬼 — 青白い貴族の男、黒と赤のマント、牙、赤い目
+15. 死霊術師 — 黒衣の人間の術師、髑髏の杖、足元に緑の魂
+16. 骨の王 — 巨大な骸骨の王、骨の玉座のかけらを背負う、王冠と大剣
+
+==================== sheet5.png　竜と強敵 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 老いた竜 — 年老いた赤茶色の竜、傷だらけの鱗、口から煙
+2. ワイバーン — 緑灰色の翼竜、二本足、尻尾の毒針
+3. バシリスク — 八本足の大トカゲ、王冠のような鶏冠、石化の目
+4. メデューサ — 蛇の髪の女、下半身は大蛇、弓を持つ、光る目
+5. 死の騎士 — 朽ちた黒鎧の骸骨騎士、青い鬼火の目、錆びた大剣
+6. 金ゴーレム — 黄金でできた巨人、宝石の目、重厚な拳
+7. 混沌騎士 — 歪んだ棘だらけの鎧の騎士、色が渦巻く盾
+8. 影竜 — 黒い影でできた竜、紫の目、煙のような翼
+9. 虚空の眼 — 黒い裂け目から覗く巨大な目、星屑が漏れる
+10. 疫病騎士 — 腐った緑の鎧の騎士、瘴気を吐く兜、錆びた鎚
+11. 炎のリッチ — 燃える頭蓋骨のリッチ、炎のローブ、火の杖
+12. 鉄ゴーレム — 黒鉄の巨人、リベット留めの体、胸に赤い炉
+13. ルーン守護者 — 青く光るルーン文字を刻んだ石の巨像
+14. 老ミミック — 苔むした巨大な宝箱の怪物、何本もの舌と脚
+15. 虚空の粘液 — 星空のように黒く光る粘液の塊
+16. 呪われた鎧 — 中身のない動く鎧、隙間から紫の霧、呪いの剣
+
+==================== sheet6.png　天と魔 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 死神蛾 — 髑髏の顔を持つ巨大な黒い蛾、灰色の鱗粉
+2. 罪喰い — 大きな口を持つ痩せた黒い怪人、無数の歯
+3. 大ウィスプ — いくつもの火の玉が集まった大きな青白い光
+4. 光の精霊 — 白く輝く翼の精霊、顔は光で見えない
+5. 堕天使 — 黒く汚れた翼の天使、折れた光輪、黒い剣
+6. 悪魔公爵 — 山羊の角の巨大な悪魔の貴族、豪華な鎧、炎の剣
+7. 虚空竜 — 黒紫の星空の鱗を持つ巨竜、裂けた空間の翼
+8. 聖騎士 — 白銀の鎧の騎士、金の装飾、光る長剣と十字の盾
+9. 闇の神託 — 目隠しをした黒衣の巫女、宙に浮く水晶玉
+10. 魂の刈人 — 大鎌を持つ黒いフードの死神、緑の魂の炎
+11. 神聖獣 — 白と金の毛並みの巨大な獅子、光の翼
+12. 混沌の君 — いくつもの顔を持つ混沌の王、ねじれた王冠
+13. 大悪魔 — 赤黒い巨大な悪魔、四本の腕、燃える角
+14. 嵐天使 — 雷をまとう灰青の天使、稲妻の槍
+15. 死天使 — 黒い翼と白い骨の顔の天使、砂時計を持つ
+16. 虚空騎士 — 星空のような黒い鎧の騎士、紫に光る剣
+
+==================== sheet7.png　最深部と宿敵 ====================
+Create ONE square image: a strict 4x4 grid of 16 different monster sprites for a dark-fantasy dungeon RPG.
+LAYOUT (do not change): 4 rows x 4 columns, equal cells, one monster per cell, numbered left-to-right, top-to-bottom (1-4 top row, 13-16 bottom row). Nothing crosses cell borders. Leave a clear margin around every monster.
+BACKGROUND: flat solid magenta #FF00FF only. No shadows on the ground, no floor, no text, no numbers, no frames, no grid lines.
+STYLE (same for all 16): detailed 16-bit pixel art, thick dark outlines, dithered shading, rich but limited palette, gritty dark-fantasy mood, front-facing battle stance, whole body visible, feet near the bottom of each cell.
+MONSTERS (descriptions in Japanese):
+1. 聖ゴーレム — 白い大理石と金でできたゴーレム、胸に光の紋章
+2. 呪詛使い — 呪符を全身に貼った痩せた術師、黒紫の炎
+3. 破滅の守護者 — 黒曜石の巨大な番人、両手の大剣、赤い目
+4. 蒼白の騎者 — 痩せた蒼白い馬に乗る骸骨の騎手、大鎌
+5. 星の番人 — 星図を刻んだ鎧の巨人、頭上に星の輪
+6. 深淵の眼 — 闇の中に無数の目が開く巨大な塊、触手
+7. 永遠の騎士 — 古代の金の鎧の騎士、色あせたマント、ひびの入った大盾
+8. 罪竜 — 赤黒い鎖に縛られた巨竜、鱗に罪人の顔
+9. 廃墟の王 — 崩れた城の瓦礫をまとう巨人の王、石の王冠
+10. 闇の王 — 黒い玉座の主、漆黒の甲冑、角のある兜、黒い炎のマント
+11. 公の幻影 — 鏡のように半透明な、王冠と紫のマントを着た誇り高い老君主の幻
+12. 玉座の守護者 — 玉座を守る巨大な鎧の番人、金の装飾、斧槍
+13. 勇者の神託 — 白い衣に金の冠の神秘的な巫女、背に光の輪
+14. 腐敗した勇者アレックス — 堕落した若い勇者、黒く腐食した聖鎧、赤く光る目、折れた聖剣
+15. 黄金の亡霊 — 金貨をばらまく金色に光る小さな亡霊、にやけ顔
+16. 奈落の王 — 奈落の底の巨大な王、黒い触手の冠、無数の目、闇のマント
