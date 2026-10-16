@@ -6,8 +6,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016a";
-import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016a";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016b";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016b";
 
 // 立体版の追加要素を通常版のデータに合流させる
 Object.assign(EQUIPMENT, RARES);
@@ -160,9 +160,9 @@ const SONGS = {
 };
 // 階ごとに調と速さを変える（同じ旋律でも雰囲気が変わる）
 const FLOOR_KEY = [{ root: 50, bpm: 74 }, { root: 52, bpm: 70 }, { root: 48, bpm: 64 }, { root: 53, bpm: 78 }, { root: 47, bpm: 84 }, { root: 45, bpm: 54 }];
-// 場面と曲の対応（探索は表題の曲を使う。探索用の曲ができたら explore を足す）
-const BGM_VER = "20261016a";
-const BGM_FILE = { title: "title", explore: "title", battle: "battle", boss: "boss", abyss: "abyss", town: "town", ending: "ending" };
+// 場面と曲の対応
+const BGM_VER = "20261016b";
+const BGM_FILE = { title: "title", explore: "explore", battle: "battle", boss: "boss", abyss: "abyss", town: "town", ending: "ending" };
 const music = {
   on: (() => { try { return localStorage.getItem("sakambit_music") !== "off"; } catch { return true; } })(),
   song: null, key: null, gain: null, step: 0, next: 0, timer: null,
@@ -170,7 +170,7 @@ const music = {
   vol: 0.55, fileVol: 0.85, files: {}, loading: false, src: null, want: null,
   loadFiles() {
     if (this.loading || !audio.ctx || TEST) return; this.loading = true;
-    const order = ["title", "battle", "town", "boss", "abyss", "ending"];
+    const order = ["title", "explore", "battle", "town", "boss", "abyss", "ending"];
     order.reduce((p, n) => p.then(() => fetch(`3d/bgm/${n}.mp3?v=${BGM_VER}`)
       .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
       .then(b => audio.ctx.decodeAudioData(b))
