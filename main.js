@@ -1512,6 +1512,12 @@ function closeModal() {
 
 // 右側のプレビュー：戦闘中は現れている敵の絵・名前・体力を表示
 function drawSpriteTo(g, id, cx, cy, ps) {
+  const img = monsterImages[id];
+  if (img && img.complete && img.naturalWidth) {
+    const sz = 32 * ps; g.imageSmoothingEnabled = true;
+    g.drawImage(img, Math.round(cx - sz / 2), Math.round(cy - sz / 2), sz, sz);
+    return;
+  }
   const spr = SPRITES[id] || SPRITES.skeleton;
   const rows = spr.d, H = rows.length, W = rows[0].length;
   const ox = Math.round(cx - W * ps / 2), oy = Math.round(cy - H * ps / 2);
@@ -2675,6 +2681,8 @@ const MONSTER_ART = {
   cave_bear: "007_bear",
   stone_troll: "006_gorilla", mud_troll: "014_gorilla_elite"
 };
+// 描き下ろしの絵（img/monsters/m_<名前>.png）。tools/monster_sheets.json と同じ並び
+for (const id of "skeleton brigand goblin zombie imp bandit thug hollow mushroom_man bone_dog gargoyle brass_knight prison_guard warden minotaur iron_claw cave_bat slime cave_spider toad mud_bat cave_worm moth stone_snake bronze_scarab crystal_fly venom_moth cave_leech rock_crab mold_creep swarm_bee gloom_bat rust_sprite wisp golem fire_elemental ice_sprite hex_eye amber_golem sand_wraith dust_devil toxic_ooze jar_ghost chaos_sprite magma_slug shade chain_ghost mist_hag dark_knight bone_mage plague_doc eye_beast rot_walker blood_moth tomb_bat ruin_warden hex_hand cave_horror banshee lich mimic vampire necromancer bone_lord dragon wyvern basilisk medusa death_knight gold_golem chaos_knight shadow_dragon void_eye plague_knight flame_lich iron_golem rune_guardian elder_mimic void_slime cursed_armor death_moth sin_eater arch_wisp angel fallen_angel demon_lord void_dragon holy_knight dark_oracle soul_reaper divine_beast chaos_lord archdemon storm_angel death_angel void_knight holy_golem curse_mage doom_guardian pale_rider star_warden abyss_eye eternal_knight sin_dragon ruin_lord dark_lord mirror guardian oracle boss golden_ghost abyss_king".split(" ")) MONSTER_ART[id] = "m_" + id;
 const monsterImages = {};
 for (const [id, file] of Object.entries(MONSTER_ART)) {
   const img = new Image();
@@ -2686,7 +2694,7 @@ function drawMonsterGlyph(id, x, y) {
   const img = monsterImages[id];
   if (img && img.complete && img.naturalWidth) {
     const s = 128;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = MONSTER_ART[id].startsWith("m_");
     ctx.drawImage(img, Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     ctx.imageSmoothingEnabled = true;
     return;

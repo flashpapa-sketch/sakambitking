@@ -6,8 +6,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016b";
-import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016b";
+import { CLASSES, partyTemplate, EQUIPMENT, ITEMS, SPELLS, CHESTS, MONSTERS, FLOORS, SPRITES, PROLOGUE, BOSS_INTRO, NAMED_ALLIES } from "./data.js?v=20261016c";
+import { RARES, TIER_NAMES, TIER_COLORS, rollRare, SIGILS, EXTRA_MONSTERS, SPRITE_ALIAS, ABYSS_FLOOR, ABYSS_CHEST, ABYSS_INTRO, ABYSS_END, ARENA, ACHIEVEMENTS } from "./extra.js?v=20261016c";
 
 // 立体版の追加要素を通常版のデータに合流させる
 Object.assign(EQUIPMENT, RARES);
@@ -36,6 +36,8 @@ const MONSTER_ART = {
   hound: "002_wolf", wolf_shade: "010_wolf_elite", shadow_dog: "008_hyena", cave_bear: "007_bear",
   stone_troll: "006_gorilla", mud_troll: "014_gorilla_elite"
 };
+// 描き下ろしの絵（img/monsters/m_<名前>.png）
+for (const id of "skeleton brigand goblin zombie imp bandit thug hollow mushroom_man bone_dog gargoyle brass_knight prison_guard warden minotaur iron_claw cave_bat slime cave_spider toad mud_bat cave_worm moth stone_snake bronze_scarab crystal_fly venom_moth cave_leech rock_crab mold_creep swarm_bee gloom_bat rust_sprite wisp golem fire_elemental ice_sprite hex_eye amber_golem sand_wraith dust_devil toxic_ooze jar_ghost chaos_sprite magma_slug shade chain_ghost mist_hag dark_knight bone_mage plague_doc eye_beast rot_walker blood_moth tomb_bat ruin_warden hex_hand cave_horror banshee lich mimic vampire necromancer bone_lord dragon wyvern basilisk medusa death_knight gold_golem chaos_knight shadow_dragon void_eye plague_knight flame_lich iron_golem rune_guardian elder_mimic void_slime cursed_armor death_moth sin_eater arch_wisp angel fallen_angel demon_lord void_dragon holy_knight dark_oracle soul_reaper divine_beast chaos_lord archdemon storm_angel death_angel void_knight holy_golem curse_mage doom_guardian pale_rider star_warden abyss_eye eternal_knight sin_dragon ruin_lord dark_lord mirror guardian oracle boss golden_ghost abyss_king".split(" ")) MONSTER_ART[id] = "m_" + id;
 const STATUS_LABELS = { poison: "毒", sleep: "睡眠", paralyze: "麻痺", burn: "炎上", bleed: "出血", slow: "鈍化" };
 const ENDING_HTML = `
   <h1>逆襲、成る</h1>
@@ -161,7 +163,7 @@ const SONGS = {
 // 階ごとに調と速さを変える（同じ旋律でも雰囲気が変わる）
 const FLOOR_KEY = [{ root: 50, bpm: 74 }, { root: 52, bpm: 70 }, { root: 48, bpm: 64 }, { root: 53, bpm: 78 }, { root: 47, bpm: 84 }, { root: 45, bpm: 54 }];
 // 場面と曲の対応
-const BGM_VER = "20261016b";
+const BGM_VER = "20261016c";
 const BGM_FILE = { title: "title", explore: "explore", battle: "battle", boss: "boss", abyss: "abyss", town: "town", ending: "ending" };
 const music = {
   on: (() => { try { return localStorage.getItem("sakambit_music") !== "off"; } catch { return true; } })(),
